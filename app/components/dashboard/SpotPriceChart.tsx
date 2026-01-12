@@ -313,30 +313,21 @@ export default function SpotPriceChart({
                 tick={{ fontSize: 9, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={false}
-                domain={[Math.floor(minPrice * 0.9), Math.ceil(maxPrice * 1.1)]}
+                domain={[
+                  Math.min(Math.floor(minPrice * 0.9), NORGESPRIS_ORE - 10), 
+                  Math.ceil(maxPrice * 1.1)
+                ]}
                 tickFormatter={(value) => `${value}`}
                 width={30}
               />
               <Tooltip content={<CustomTooltip />} />
               {/* Norgespris reference line - fixed at 50 øre/kWh */}
               <ReferenceLine 
-                y={50} 
+                y={NORGESPRIS_ORE} 
                 stroke="#3b82f6" 
-                strokeDasharray="6 3" 
-                strokeOpacity={0.8}
-                label={{ 
-                  value: "Norgespris", 
-                  position: "insideTopRight",
-                  fontSize: 10,
-                  fill: "#3b82f6"
-                }}
-              />
-              {/* Local average reference line */}
-              <ReferenceLine 
-                y={avgOre} 
-                stroke="#f59e0b" 
-                strokeDasharray="4 4" 
-                strokeOpacity={0.6}
+                strokeDasharray="8 4" 
+                strokeWidth={2}
+                strokeOpacity={0.9}
               />
               <Area
                 type="monotone"
