@@ -9,20 +9,15 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Cell,
+  BarChart,
+  Bar,
 } from "recharts";
 
 interface HourlyPrice {
   NOK_per_kWh: number;
   time_start: string;
   time_end: string;
-}
-
-interface DailyPrices {
-  prices: HourlyPrice[];
-  average: number;
-  min: number;
-  max: number;
-  date: string;
 }
 
 interface SpotPriceChartProps {
@@ -35,10 +30,8 @@ interface SpotPriceChartProps {
 type DateOption = "yesterday" | "today" | "tomorrow";
 
 // Constants for Norwegian electricity pricing (updated January 2026)
-// Note: API from hvakosterstrommen.no returns prices INCLUDING 25% VAT
-// Exception: NO4 (Nord-Norge) has 0% VAT on electricity
-const STROMSTOTTE_THRESHOLD_EKS_MVA = 77; // øre/kWh eks mva (from Jan 2026)
-const STROMSTOTTE_THRESHOLD_INKL_MVA = 96; // 96.25 øre inkl mva, rounded
+const STROMSTOTTE_THRESHOLD_EKS_MVA = 77; // øre/kWh eks mva
+const STROMSTOTTE_THRESHOLD_INKL_MVA = 96; // øre inkl mva
 const STROMSTOTTE_COVERAGE = 0.90; // 90% coverage above threshold
 
 export default function SpotPriceChart({ 
@@ -56,10 +49,14 @@ export default function SpotPriceChart({
   
   const currentHour = new Date().getHours();
 
+  // NO4 (Nord-Norge) has no VAT
+  const isNordNorge = priceArea === "NO4";
+  const supportThreshold = isNordNorge ? STROMSTOTTE_THRESHOLD_EKS_MVA : STROMSTOTTE_THRESHOLD_INKL_MVA;
+
   // Fetch prices for a specific date
   const fetchPricesForDate = async (dateOption: DateOption) => {
     const today = new Date();
-    let targetDate = new Date(today);
+    const targetDate = new Date(today);
     
     if (dateOption === "yesterday") {
       targetDate.setDate(today.getDate() - 1);
@@ -82,7 +79,7 @@ export default function SpotPriceChart({
       if (!response.ok) {
         if (dateOption === "tomorrow") {
           setTomorrowAvailable(false);
-          setError("Morgendagens priser er ikke publisert ennå (kommer ca. kl 13:00)");
+          setError("Morgendagens priser kommer ca. kl 13:00");
         } else {
           setError("Kunne ikke hente priser");
         }
@@ -96,14 +93,10 @@ export default function SpotPriceChart({
         return;
       }
       
-      // Calculate average
       const avg = data.reduce((sum, p) => sum + p.NOK_per_kWh, 0) / data.length;
-      
       setPrices(data);
       setAverage(avg);
-      if (dateOption === "tomorrow") {
-        setTomorrowAvailable(true);
-      }
+      if (dateOption === "tomorrow") setTomorrowAvailable(true);
     } catch (err) {
       setError("Feil ved henting av priser");
       console.error(err);
@@ -112,12 +105,9 @@ export default function SpotPriceChart({
     }
   };
 
-  // Handle date change
   const handleDateChange = (dateOption: DateOption) => {
     setSelectedDate(dateOption);
-    
     if (dateOption === "today") {
-      // Use initial data for today
       setPrices(initialPrices);
       setAverage(initialAverage);
       setError(null);
@@ -126,7 +116,6 @@ export default function SpotPriceChart({
     }
   };
 
-  // Check if tomorrow's prices are available on mount
   useEffect(() => {
     const checkTomorrow = async () => {
       const tomorrow = new Date();
@@ -145,91 +134,73 @@ export default function SpotPriceChart({
         setTomorrowAvailable(false);
       }
     };
-    
     checkTomorrow();
   }, [priceArea]);
 
-  // Calculate price after strømstøtte (government support)
-  // If price > 77 øre eks mva (96 øre inkl mva), government pays 90% of the excess
-  // For NO4 (Nord-Norge), threshold is 77 øre (no VAT in that region)
-  const isNordNorge = priceArea === "NO4";
-  const supportThreshold = isNordNorge ? STROMSTOTTE_THRESHOLD_EKS_MVA : STROMSTOTTE_THRESHOLD_INKL_MVA;
-  
+  // Calculate price after strømstøtte
   const calculatePriceAfterSupport = (priceOre: number): number => {
-    if (priceOre <= supportThreshold) {
-      return priceOre;
-    }
+    if (priceOre <= supportThreshold) return priceOre;
     const excess = priceOre - supportThreshold;
-    const support = excess * STROMSTOTTE_COVERAGE;
-    return Math.round(priceOre - support);
+    return Math.round(priceOre - excess * STROMSTOTTE_COVERAGE);
   };
 
-  // Transform data for the chart
-  // API returns prices INCLUDING 25% VAT (except NO4 which has 0% VAT)
+  // Transform data
   const chartData = prices.map((price) => {
     const hour = new Date(price.time_start).getHours();
-    const priceOre = Math.round(price.NOK_per_kWh * 100); // øre (already includes VAT from API)
-    const priceAfterSupport = calculatePriceAfterSupport(priceOre);
-    const hasSupport = priceOre > supportThreshold;
+    const spotPrice = Math.round(price.NOK_per_kWh * 100);
+    const youPay = calculatePriceAfterSupport(spotPrice);
+    const support = spotPrice - youPay;
     
     return {
-      hour: `${hour.toString().padStart(2, "0")}:00`,
+      hour: `${hour.toString().padStart(2, "0")}`,
       hourNum: hour,
-      price: priceOre, // Spot price (includes VAT for NO1-3,5, no VAT for NO4)
-      priceAfterSupport, // What you actually pay after strømstøtte
+      spotPrice,
+      youPay,
+      support,
       isCurrent: selectedDate === "today" && hour === currentHour,
-      isExpensive: priceOre > supportThreshold * 1.5,
-      isCheap: priceOre < supportThreshold * 0.6,
-      hasSupport,
     };
   });
 
-  // Find min and max for better visualization
-  const minPrice = chartData.length > 0 ? Math.min(...chartData.map(d => d.price)) : 0;
-  const maxPrice = chartData.length > 0 ? Math.max(...chartData.map(d => d.price)) : 100;
-  const minPriceAfterSupport = chartData.length > 0 ? Math.min(...chartData.map(d => d.priceAfterSupport)) : 0;
-  const maxPriceAfterSupport = chartData.length > 0 ? Math.max(...chartData.map(d => d.priceAfterSupport)) : 100;
-  const avgOre = Math.round(average * 100); // Average (API already includes VAT)
-  const avgAfterSupport = calculatePriceAfterSupport(avgOre);
+  // Stats
+  const currentData = chartData.find(d => d.isCurrent);
+  const minYouPay = Math.min(...chartData.map(d => d.youPay));
+  const maxYouPay = Math.max(...chartData.map(d => d.youPay));
+  const avgYouPay = Math.round(chartData.reduce((sum, d) => sum + d.youPay, 0) / chartData.length);
+  const totalSupport = chartData.reduce((sum, d) => sum + d.support, 0);
+  const cheapestHour = chartData.reduce((min, d) => d.youPay < min.youPay ? d : min, chartData[0]);
+  const mostExpensiveHour = chartData.reduce((max, d) => d.youPay > max.youPay ? d : max, chartData[0]);
 
-  // Get date label
-  const getDateLabel = (option: DateOption) => {
-    const today = new Date();
-    const targetDate = new Date(today);
-    
-    if (option === "yesterday") {
-      targetDate.setDate(today.getDate() - 1);
-    } else if (option === "tomorrow") {
-      targetDate.setDate(today.getDate() + 1);
-    }
-    
-    return targetDate.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" });
+  // Color based on price
+  const getBarColor = (youPay: number, isCurrent: boolean) => {
+    if (isCurrent) return "#f59e0b"; // amber for current
+    if (youPay <= 60) return "#22c55e"; // green for cheap
+    if (youPay >= 120) return "#ef4444"; // red for expensive
+    return "#a1a1aa"; // gray for normal
   };
 
   // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
+  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: typeof chartData[0] }> }) => {
     if (active && payload && payload.length) {
-      const data = chartData.find(d => d.hour === label);
-      if (!data) return null;
-      
-      const isCurrent = data.isCurrent;
-      const afterSupport = data.priceAfterSupport;
-      const hasSupport = data.hasSupport;
-      const savings = data.price - afterSupport;
+      const data = payload[0].payload;
+      const isCheap = data.youPay <= 60;
+      const isExpensive = data.youPay >= 120;
       
       return (
         <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            {label} {isCurrent && "(nå)"}
+            Kl {data.hour}:00 {data.isCurrent && <span className="text-amber-500">• Nå</span>}
           </p>
-          <p className={`text-lg font-bold ${afterSupport < 70 ? "text-emerald-600 dark:text-emerald-400" : afterSupport > 100 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
-            {afterSupport} øre/kWh
+          <p className={`text-xl font-bold ${isCheap ? "text-emerald-600" : isExpensive ? "text-red-600" : "text-zinc-900 dark:text-zinc-100"}`}>
+            {data.youPay} øre
           </p>
-          {hasSupport && (
+          {data.support > 0 && (
             <p className="text-xs text-emerald-600 dark:text-emerald-400">
-              inkl. strømstøtte (-{savings} øre)
+              Strømstøtte: -{data.support} øre
             </p>
           )}
+          <p className="text-xs text-zinc-400 mt-1">
+            Spotpris: {data.spotPrice} øre
+          </p>
         </div>
       );
     }
@@ -238,71 +209,77 @@ export default function SpotPriceChart({
 
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      {/* Header with date selector */}
+      {/* Header */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Strømpris i dag</h3>
-          <p className="text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
-            {priceAreaName} • Inkl. mva, etter strømstøtte
+          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">
+            Strømpris time for time
+          </h3>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {priceAreaName} • Det du faktisk betaler etter strømstøtte
           </p>
         </div>
         
-        {/* Date tabs - scrollable on mobile */}
-        <div className="flex w-full overflow-x-auto rounded-lg border border-zinc-200 p-1 sm:w-auto dark:border-zinc-700">
-          <button
-            onClick={() => handleDateChange("yesterday")}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              selectedDate === "yesterday"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            }`}
-          >
-            I går
-          </button>
-          <button
-            onClick={() => handleDateChange("today")}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              selectedDate === "today"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            }`}
-          >
-            I dag
-          </button>
-          <button
-            onClick={() => handleDateChange("tomorrow")}
-            disabled={!tomorrowAvailable}
-            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-              selectedDate === "tomorrow"
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : tomorrowAvailable
-                  ? "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                  : "cursor-not-allowed text-zinc-300 dark:text-zinc-600"
-            }`}
-          >
-            I morgen {!tomorrowAvailable && "🕐"}
-          </button>
+        {/* Date selector */}
+        <div className="flex rounded-lg border border-zinc-200 p-1 dark:border-zinc-700">
+          {(["yesterday", "today", "tomorrow"] as DateOption[]).map((opt) => (
+            <button
+              key={opt}
+              onClick={() => handleDateChange(opt)}
+              disabled={opt === "tomorrow" && !tomorrowAvailable}
+              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                selectedDate === opt
+                  ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                  : opt === "tomorrow" && !tomorrowAvailable
+                    ? "text-zinc-300 dark:text-zinc-600"
+                    : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400"
+              }`}
+            >
+              {opt === "yesterday" ? "I går" : opt === "today" ? "I dag" : "I morgen"}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Legend - simplified */}
-      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
-        <div className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-amber-500"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">Strømpris (etter støtte)</span>
+      {/* Quick summary for today */}
+      {selectedDate === "today" && currentData && !error && (
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-xl bg-amber-50 p-3 dark:bg-amber-950/30">
+            <p className="text-xs text-amber-700 dark:text-amber-400">Nå (kl {currentHour})</p>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{currentData.youPay}<span className="text-sm font-normal"> øre</span></p>
+          </div>
+          <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/30">
+            <p className="text-xs text-emerald-700 dark:text-emerald-400">Billigst (kl {cheapestHour.hour})</p>
+            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{minYouPay}<span className="text-sm font-normal"> øre</span></p>
+          </div>
+          <div className="rounded-xl bg-red-50 p-3 dark:bg-red-950/30">
+            <p className="text-xs text-red-700 dark:text-red-400">Dyrest (kl {mostExpensiveHour.hour})</p>
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{maxYouPay}<span className="text-sm font-normal"> øre</span></p>
+          </div>
+          <div className="rounded-xl bg-zinc-100 p-3 dark:bg-zinc-800">
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">Snitt i dag</p>
+            <p className="text-2xl font-bold text-zinc-700 dark:text-zinc-200">{avgYouPay}<span className="text-sm font-normal"> øre</span></p>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 border-t-2 border-dashed border-emerald-500"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">Støttegrense ({supportThreshold} øre)</span>
+      )}
+
+      {/* Strømstøtte badge if significant */}
+      {totalSupport > 50 && !error && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
+          <span className="text-lg">💰</span>
+          <div>
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">
+              Du sparer ca. {Math.round(totalSupport / 100)} kr i strømstøtte i dag
+            </p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              Staten dekker 90% av prisen over {supportThreshold} øre
+            </p>
+          </div>
         </div>
-        <div className="ml-auto flex gap-3 text-zinc-500 dark:text-zinc-400">
-          <span>Lavest: <strong className="text-emerald-600 dark:text-emerald-400">{minPriceAfterSupport}</strong></span>
-          <span>Høyest: <strong className="text-red-600 dark:text-red-400">{maxPriceAfterSupport}</strong></span>
-        </div>
-      </div>
+      )}
       
-      {/* Chart - shorter on mobile */}
-      <div className="relative h-[160px] w-full sm:h-[200px]">
+      {/* Chart */}
+      <div className="relative h-[180px] w-full sm:h-[220px]">
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-zinc-900/80">
             <div className="flex items-center gap-2 text-sm text-zinc-500">
@@ -317,251 +294,97 @@ export default function SpotPriceChart({
         
         {error ? (
           <div className="flex h-full items-center justify-center">
-            <div className="text-center px-4">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
-              {selectedDate === "tomorrow" && !tomorrowAvailable && (
-                <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                  Nord Pool publiserer morgendagens priser ca. kl 13:00
-                </p>
-              )}
-            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-              <defs>
-                <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <BarChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 0 }}>
               <XAxis 
                 dataKey="hour" 
-                tick={{ fontSize: 9, fill: '#71717a' }}
+                tick={{ fontSize: 10, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={false}
-                interval={3}
+                interval={2}
               />
               <YAxis 
-                tick={{ fontSize: 9, fill: '#71717a' }}
+                tick={{ fontSize: 10, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={false}
-                domain={[
-                  Math.min(Math.floor(minPriceAfterSupport * 0.8), 20), 
-                  Math.ceil(maxPriceAfterSupport * 1.2)
-                ]}
-                tickFormatter={(value) => `${value}`}
-                width={30}
+                domain={[0, Math.ceil(maxYouPay * 1.2)]}
+                tickFormatter={(v) => `${v}`}
+                width={35}
               />
-              <Tooltip content={<CustomTooltip />} />
-              {/* Strømstøtte threshold reference line */}
+              <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(0,0,0,0.05)' }} />
               <ReferenceLine 
                 y={supportThreshold} 
                 stroke="#10b981" 
-                strokeDasharray="8 4" 
-                strokeWidth={2}
-                strokeOpacity={0.7}
+                strokeDasharray="4 4" 
+                strokeWidth={1.5}
+                label={{ value: `Støttegrense ${supportThreshold} øre`, position: 'right', fontSize: 9, fill: '#10b981' }}
               />
-              <Area
-                type="monotone"
-                dataKey="priceAfterSupport"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                fill="url(#priceGradient)"
-                dot={(props) => {
-                  const { cx, cy, payload } = props;
-                  if (payload.isCurrent) {
-                    return (
-                      <circle
-                        key={payload.hour}
-                        cx={cx}
-                        cy={cy}
-                        r={5}
-                        fill="#f59e0b"
-                        stroke="#fff"
-                        strokeWidth={2}
-                      />
-                    );
-                  }
-                  return <circle key={payload.hour} cx={cx} cy={cy} r={0} />;
-                }}
-                activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
-              />
-            </AreaChart>
+              <Bar dataKey="youPay" radius={[4, 4, 0, 0]}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={getBarColor(entry.youPay, entry.isCurrent)} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         )}
       </div>
-      
-      {/* Current hour highlight - only show for today */}
-      {selectedDate === "today" && !error && (() => {
-        const currentData = chartData.find(d => d.isCurrent);
-        const spotPrice = currentData?.price || avgOre;
-        const priceAfterSupport = currentData?.priceAfterSupport || avgAfterSupport;
-        const hasSupport = currentData?.hasSupport || false;
-        const savings = spotPrice - priceAfterSupport;
-        
-        const isExpensive = priceAfterSupport > 100;
-        const isCheap = priceAfterSupport < 60;
-        
-        const cheapestHour = chartData.reduce((min, d) => d.priceAfterSupport < min.priceAfterSupport ? d : min, chartData[0]);
-        const hoursUntilCheapest = (cheapestHour.hourNum - currentHour + 24) % 24;
-        
-        return (
-          <div className="mt-3 space-y-3 sm:mt-4">
-            {/* Current price with context */}
-            <div className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 ${
-              isExpensive 
-                ? "bg-red-50 dark:bg-red-950/30" 
-                : isCheap 
-                  ? "bg-emerald-50 dark:bg-emerald-950/30"
-                  : "bg-amber-50 dark:bg-amber-950/30"
-            }`}>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-10 sm:w-10 ${
-                  isExpensive 
-                    ? "bg-red-100 dark:bg-red-900/50" 
-                    : isCheap
-                      ? "bg-emerald-100 dark:bg-emerald-900/50"
-                      : "bg-amber-100 dark:bg-amber-900/50"
-                }`}>
-                  <span className="text-base sm:text-lg">{isExpensive ? "📈" : isCheap ? "✅" : "⚡"}</span>
-                </div>
-                <div>
-                  <p className={`text-xs font-medium sm:text-sm ${
-                    isExpensive 
-                      ? "text-red-900 dark:text-red-100" 
-                      : isCheap
-                        ? "text-emerald-900 dark:text-emerald-100"
-                        : "text-amber-900 dark:text-amber-100"
-                  }`}>
-                    {isExpensive 
-                      ? "Høy strømpris nå" 
-                      : isCheap 
-                        ? "Lav strømpris nå"
-                        : "Normal strømpris"}
-                  </p>
-                  <p className={`text-xs ${
-                    isExpensive 
-                      ? "text-red-700 dark:text-red-400" 
-                      : isCheap
-                        ? "text-emerald-700 dark:text-emerald-400"
-                        : "text-amber-700 dark:text-amber-400"
-                  }`}>
-                    Spot: {spotPrice} øre {hasSupport && <span className="text-emerald-600 dark:text-emerald-400">• Støtte: -{savings} øre</span>}
-                  </p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-xl font-bold sm:text-2xl ${
-                  isExpensive 
-                    ? "text-red-600 dark:text-red-400" 
-                    : isCheap
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-amber-600 dark:text-amber-400"
-                }`}>
-                  {priceAfterSupport} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  kl {currentHour.toString().padStart(2, "0")}:00 • inkl. mva
-                </p>
-              </div>
+
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-emerald-500"></span>
+          <span>Billig (&lt;60 øre)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-zinc-400"></span>
+          <span>Normal</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-red-500"></span>
+          <span>Dyrt (&gt;120 øre)</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded bg-amber-500"></span>
+          <span>Nå</span>
+        </div>
+      </div>
+
+      {/* Tips for today */}
+      {selectedDate === "today" && currentData && !error && (
+        <div className="mt-4 space-y-2">
+          {currentData.youPay > cheapestHour.youPay + 20 && cheapestHour.hourNum > currentHour && (
+            <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs dark:bg-blue-950/30">
+              <span>💡</span>
+              <span className="text-blue-800 dark:text-blue-300">
+                <strong>Tips:</strong> Vent til kl {cheapestHour.hour}:00 – da er strømmen {currentData.youPay - cheapestHour.youPay} øre billigere
+              </span>
             </div>
-
-            {/* Tip: Best time to use electricity */}
-            {isExpensive && hoursUntilCheapest > 0 && hoursUntilCheapest < 12 && (
-              <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs dark:bg-blue-950/30">
-                <span>💡</span>
-                <span className="text-blue-800 dark:text-blue-300">
-                  <strong>Tips:</strong> Billigst kl {cheapestHour.hour} ({cheapestHour.priceAfterSupport} øre) – om {hoursUntilCheapest} time{hoursUntilCheapest > 1 ? "r" : ""}
-                </span>
-              </div>
-            )}
-
-            {/* Strømstøtte explanation */}
-            <details className="group rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
-              <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                <span>ℹ️ Hva er strømstøtten?</span>
-                <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </summary>
-              <div className="border-t border-zinc-200 px-3 py-2 text-xs text-zinc-600 space-y-2 dark:border-zinc-700 dark:text-zinc-400">
-                <p><strong>Strømstøtten</strong> er en statlig ordning der staten dekker <strong>90%</strong> av strømprisen over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre/kWh (eks. mva).</p>
-                
-                <p><strong>Slik beregnes det (fra jan 2026):</strong></p>
-                <ul className="list-disc list-inside space-y-1 text-zinc-500 dark:text-zinc-500">
-                  <li>Grense: {STROMSTOTTE_THRESHOLD_EKS_MVA} øre eks. mva = {STROMSTOTTE_THRESHOLD_INKL_MVA} øre inkl. mva</li>
-                  <li>Over grensen: Staten betaler 90% av overskytende</li>
-                  <li>Under grensen: Du betaler full pris</li>
-                  {isNordNorge && <li><strong>Nord-Norge:</strong> Ingen mva på strøm (grense {STROMSTOTTE_THRESHOLD_EKS_MVA} øre)</li>}
-                </ul>
-
-                <p className="pt-1 border-t border-zinc-200 dark:border-zinc-700">
-                  <strong>Eksempel:</strong> Spot på 200 øre → Du betaler {supportThreshold} + 10% av (200 - {supportThreshold}) = <strong>{supportThreshold + Math.round((200 - supportThreshold) * 0.1)} øre</strong>
-                </p>
-
-                <p className="text-zinc-400 dark:text-zinc-500">
-                  Gjelder automatisk for alle husholdninger via nettleien. Alternativt kan du velge <strong>Norgespris</strong> (fast 50 øre/kWh) fra okt 2025.
-                </p>
-              </div>
-            </details>
-          </div>
-        );
-      })()}
-
-      {/* Tomorrow info */}
-      {selectedDate === "tomorrow" && !error && (
-        <div className="mt-3 flex flex-col gap-2 rounded-xl bg-blue-50 px-3 py-2.5 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:bg-blue-950/30">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 sm:h-10 sm:w-10 dark:bg-blue-900/50">
-              <span className="text-base sm:text-lg">📅</span>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-blue-900 sm:text-sm dark:text-blue-100">
-                Morgendagens priser (inkl. mva)
-              </p>
-              <p className="hidden text-xs text-blue-700 sm:block dark:text-blue-400">
-                Spot: {minPrice}–{maxPrice} øre • Etter støtte: {minPriceAfterSupport}–{maxPriceAfterSupport} øre
-              </p>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2 sm:flex-col sm:items-end sm:gap-0">
-            <p className="text-base font-bold text-blue-600 sm:text-lg dark:text-blue-400">
-              ~{avgAfterSupport} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
-            </p>
-            <p className="text-xs text-blue-500 dark:text-blue-500">
-              etter strømstøtte
-            </p>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Yesterday info */}
-      {selectedDate === "yesterday" && !error && (
-        <div className="mt-3 flex flex-col gap-2 rounded-xl bg-zinc-100 px-3 py-2.5 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:bg-zinc-800">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 sm:h-10 sm:w-10 dark:bg-zinc-700">
-              <span className="text-base sm:text-lg">📊</span>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-zinc-700 sm:text-sm dark:text-zinc-200">
-                Gårsdagens priser (inkl. mva)
-              </p>
-              <p className="hidden text-xs text-zinc-500 sm:block dark:text-zinc-400">
-                Spot: {minPrice}–{maxPrice} øre • Etter støtte: {minPriceAfterSupport}–{maxPriceAfterSupport} øre
-              </p>
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2 sm:flex-col sm:items-end sm:gap-0">
-            <p className="text-base font-bold text-zinc-700 sm:text-lg dark:text-zinc-200">
-              ~{avgAfterSupport} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
-            </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              etter strømstøtte
-            </p>
-          </div>
+      {/* Collapsible info */}
+      <details className="mt-4 group">
+        <summary className="flex cursor-pointer items-center gap-2 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300">
+          <span>ℹ️</span>
+          <span>Slik fungerer strømstøtten</span>
+          <svg className="h-3 w-3 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div className="mt-2 rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+          <p className="mb-2">Staten dekker <strong>90%</strong> av strømprisen over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre/kWh (eks. mva) = {STROMSTOTTE_THRESHOLD_INKL_MVA} øre inkl. mva.</p>
+          <p className="text-zinc-500">
+            <strong>Eksempel:</strong> Spot 150 øre → Du betaler {supportThreshold} + 10% av ({150} - {supportThreshold}) = {supportThreshold + Math.round((150 - supportThreshold) * 0.1)} øre
+          </p>
+          <p className="mt-2 text-zinc-400">
+            Alternativt kan du velge <strong>Norgespris</strong> (fast 50 øre/kWh) via Elhub.
+          </p>
         </div>
-      )}
+      </details>
     </div>
   );
 }
