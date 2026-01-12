@@ -327,7 +327,8 @@ export default function SpotPriceChart({
           <span>ℹ️ Om strømstøtten</span>
         </summary>
         <p className="mt-2 text-[10px] text-zinc-400 dark:text-zinc-500">
-          Staten dekker 90% over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre (eks. mva) = {supportThreshold} øre (inkl. mva). Alternativ: Norgespris (fast 50 øre) via Elhub.
+          Staten dekker 90% over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre (eks. mva) = {STROMSTOTTE_THRESHOLD_INKL_MVA} øre (inkl. mva).
+          {isNordNorge && " Nord-Norge har mva-fritak."} Alternativ: Norgespris (fast 50 øre/kWh) via Elhub.
         </p>
       </details>
     </div>
