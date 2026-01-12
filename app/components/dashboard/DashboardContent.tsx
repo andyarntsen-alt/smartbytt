@@ -14,7 +14,7 @@ interface DashboardContentProps {
     average: number;
     min: number;
     max: number;
-    prices: { time: string; price: number }[];
+    prices: { NOK_per_kWh: number; time_start: string; time_end: string }[];
   } | null;
   priceArea: PriceArea;
   electricityContract: {
@@ -69,39 +69,61 @@ export default function DashboardContent({
 
       {/* Quick Stats Row */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Spot Price Card */}
-        <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5 dark:border-amber-900/50 dark:from-amber-950/30 dark:to-orange-950/20">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                {t.spotPrice.title}
-              </p>
-              <p className="mt-1 text-3xl font-bold text-amber-900 dark:text-amber-100">
-                {spotPrices ? Math.round(spotPrices.average * 100) : "–"}
-                <span className="ml-1 text-base font-normal text-amber-700 dark:text-amber-400">øre/kWh</span>
-              </p>
-              <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
-                {PRICE_AREA_NAMES[priceArea]}
-              </p>
+        {/* Electricity Price Card - shows what you actually pay */}
+        {(() => {
+          // Strømstøtte constants (Jan 2026)
+          const THRESHOLD = priceArea === "NO4" ? 77 : 96; // NO4 has no VAT
+          const calcAfterSupport = (ore: number) => 
+            ore <= THRESHOLD ? ore : Math.round(ore - (ore - THRESHOLD) * 0.9);
+          
+          // Get current hour's price
+          const currentHour = new Date().getHours();
+          const currentHourPrice = spotPrices?.prices?.find(p => {
+            const h = new Date(p.time_start).getHours();
+            return h === currentHour;
+          });
+          
+          const spotOre = currentHourPrice 
+            ? Math.round(currentHourPrice.NOK_per_kWh * 100) 
+            : spotPrices ? Math.round(spotPrices.average * 100) : null;
+          
+          const youPay = spotOre ? calcAfterSupport(spotOre) : null;
+          const support = spotOre && youPay ? spotOre - youPay : 0;
+          
+          return (
+            <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-5 dark:border-amber-900/50 dark:from-amber-950/30 dark:to-orange-950/20">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                    {language === "no" ? "Du betaler nå" : "You pay now"}
+                  </p>
+                  <p className="mt-1 text-3xl font-bold text-amber-900 dark:text-amber-100">
+                    {youPay ?? "–"}
+                    <span className="ml-1 text-base font-normal text-amber-700 dark:text-amber-400">øre/kWh</span>
+                  </p>
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                    {PRICE_AREA_NAMES[priceArea]} • kl {currentHour.toString().padStart(2, "0")}:00
+                  </p>
+                </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
+                  <span className="text-2xl">⚡</span>
+                </div>
+              </div>
+              {spotPrices && spotOre && (
+                <div className="mt-3 flex flex-wrap gap-3 border-t border-amber-200 pt-3 text-xs dark:border-amber-800">
+                  <span className="text-amber-700 dark:text-amber-400">
+                    Spot: <strong>{spotOre}</strong> øre
+                  </span>
+                  {support > 0 && (
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      💰 Støtte: <strong>-{support}</strong> øre
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40">
-              <span className="text-2xl">⚡</span>
-            </div>
-          </div>
-          {spotPrices && (
-            <div className="mt-3 flex flex-wrap gap-3 border-t border-amber-200 pt-3 text-xs dark:border-amber-800">
-              <span className="text-amber-700 dark:text-amber-400">
-                {t.spotPrice.low}: <strong>{Math.round(spotPrices.min * 100)}</strong> øre
-              </span>
-              <span className="text-amber-700 dark:text-amber-400">
-                {t.spotPrice.high}: <strong>{Math.round(spotPrices.max * 100)}</strong> øre
-              </span>
-              <span className="text-blue-700 dark:text-blue-400" title="Statlig ordning: fast pris 50 øre/kWh">
-                🇳🇴 {t.spotPrice.norgespris}: <strong>50</strong> øre
-              </span>
-            </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Current Cost Card */}
         {hasContract && electricityContract ? (
