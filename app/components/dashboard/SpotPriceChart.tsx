@@ -399,10 +399,10 @@ export default function SpotPriceChart({
                       : "text-emerald-900 dark:text-emerald-100"
                   }`}>
                     {isAboveNorgespris 
-                      ? `${priceDiff} øre dyrere enn Norgespris` 
+                      ? `Spot: ${priceDiff} øre over Norgespris` 
                       : currentPrice < NORGESPRIS_ORE 
-                        ? `${priceDiff} øre billigere enn Norgespris!`
-                        : "Lik Norgespris"}
+                        ? `Spot: ${priceDiff} øre under Norgespris`
+                        : "Spot = Norgespris"}
                   </p>
                   <p className={`text-xs ${
                     isAboveNorgespris 
@@ -410,8 +410,8 @@ export default function SpotPriceChart({
                       : "text-emerald-700 dark:text-emerald-400"
                   }`}>
                     {isAboveNorgespris 
-                      ? "Vurder å utsette strømbruk hvis mulig" 
-                      : "Gunstig tidspunkt å bruke strøm"}
+                      ? "Har du Norgespris? Da betaler du kun 50 øre" 
+                      : "Spotpris er nå billigere enn Norgespris"}
                   </p>
                 </div>
               </div>
@@ -447,10 +447,23 @@ export default function SpotPriceChart({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </summary>
-              <div className="border-t border-zinc-200 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
-                <p><strong>Norgespris</strong> er en statlig støtteordning som gir deg fast strømpris på <strong>50 øre/kWh</strong> (inkl. mva).</p>
-                <p className="mt-1">Når spotprisen er over 50 øre, sparer du penger med Norgespris. Når den er under, er spotpris billigere.</p>
-                <p className="mt-1 text-zinc-500 dark:text-zinc-500">Ordningen gjelder bolig og hytte med forbrukstak.</p>
+              <div className="border-t border-zinc-200 px-3 py-2 text-xs text-zinc-600 space-y-2 dark:border-zinc-700 dark:text-zinc-400">
+                <p><strong>Norgespris</strong> er en statlig støtteordning (ikke en strømavtale) som gir deg en effektiv fastpris på <strong>50 øre/kWh</strong> inkl. mva på kraftdelen.</p>
+                
+                <p><strong>Slik fungerer det:</strong></p>
+                <ul className="list-disc list-inside space-y-1 text-zinc-500 dark:text-zinc-500">
+                  <li>Ordningen avregnes alltid mot <em>spotpris</em>, uansett hvilken avtale du har</li>
+                  <li>Er spot over 50 øre → du får fratrekk på nettleien</li>
+                  <li>Er spot under 50 øre → du betaler tillegg på nettleien</li>
+                </ul>
+
+                <p className="pt-1 border-t border-zinc-200 dark:border-zinc-700">
+                  <strong>💡 Tips:</strong> Forbrukerrådet anbefaler spotavtale med lavt påslag sammen med Norgespris, siden ordningen alltid avregnes mot spot.
+                </p>
+
+                <p className="text-zinc-400 dark:text-zinc-500">
+                  Gjelder bolig (5 000 kWh/mnd) og hytte (1 000 kWh/mnd).
+                </p>
               </div>
             </details>
           </div>
