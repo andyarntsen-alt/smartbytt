@@ -7,6 +7,8 @@ import ComparisonTable from "@/app/components/dashboard/ComparisonTable";
 import { getConnector } from "@/lib/connectors/registry";
 import { fetchSpotPrices, type PriceArea, PRICE_AREA_NAMES } from "@/lib/api/electricity-prices";
 
+export const dynamic = "force-dynamic";
+
 export default async function ComparisonPage() {
   const supabase = await createSupabaseServerClient();
   const {

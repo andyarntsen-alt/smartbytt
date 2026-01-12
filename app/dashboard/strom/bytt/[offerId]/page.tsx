@@ -3,6 +3,8 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import SwitchFlow from "@/app/components/dashboard/SwitchFlow";
 
+export const dynamic = "force-dynamic";
+
 interface PageProps {
   params: Promise<{ offerId: string }>;
 }

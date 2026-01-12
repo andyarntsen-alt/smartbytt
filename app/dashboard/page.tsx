@@ -5,6 +5,8 @@ import { getConnector } from "@/lib/connectors/registry";
 import { fetchSpotPrices, type PriceArea, PRICE_AREA_NAMES } from "@/lib/api/electricity-prices";
 import SpotPriceChart from "@/app/components/dashboard/SpotPriceChart";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   const supabase = await createSupabaseServerClient();
   const {

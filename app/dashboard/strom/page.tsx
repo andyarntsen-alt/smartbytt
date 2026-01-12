@@ -3,6 +3,8 @@ import Link from "next/link";
 import ElectricityForm from "@/app/components/forms/ElectricityForm";
 import InvoiceUpload from "@/app/components/forms/InvoiceUpload";
 
+export const dynamic = "force-dynamic";
+
 export default async function ElectricityPage() {
   const supabase = await createSupabaseServerClient();
   const {
