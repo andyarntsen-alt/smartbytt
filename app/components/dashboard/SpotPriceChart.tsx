@@ -182,14 +182,20 @@ export default function SpotPriceChart({
     if (active && payload && payload.length) {
       const data = chartData.find(d => d.hour === label);
       const isCurrent = data?.isCurrent;
+      const price = payload[0].value;
+      const isAboveNorgespris = price > NORGESPRIS_ORE;
+      const diff = Math.abs(price - NORGESPRIS_ORE);
       
       return (
         <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
             {label} {isCurrent && "(nå)"}
           </p>
-          <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
-            {payload[0].value} øre/kWh
+          <p className={`text-lg font-bold ${isAboveNorgespris ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+            {price} øre/kWh
+          </p>
+          <p className={`text-xs ${isAboveNorgespris ? "text-red-500" : "text-emerald-500"}`}>
+            {isAboveNorgespris ? `+${diff} øre over` : price < NORGESPRIS_ORE ? `${diff} øre under` : "Lik"} Norgespris
           </p>
         </div>
       );
@@ -202,8 +208,10 @@ export default function SpotPriceChart({
       {/* Header with date selector */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Spotpris time for time</h3>
-          <p className="text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">{priceAreaName}</p>
+          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Strømpris i dag</h3>
+          <p className="text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
+            {priceAreaName} • Se når strømmen er billigst
+          </p>
         </div>
         
         {/* Date tabs - scrollable on mobile */}
@@ -244,31 +252,19 @@ export default function SpotPriceChart({
         </div>
       </div>
 
-      {/* Stats row - stacked on mobile */}
-      <div className="mb-4 grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap sm:gap-4">
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 sm:h-3 sm:w-3"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">
-            <span className="hidden sm:inline">Snitt: </span><strong className="text-amber-600 dark:text-amber-400">{avgOre}</strong><span className="hidden sm:inline"> øre</span>
-          </span>
+      {/* Legend - simplified */}
+      <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        <div className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 bg-amber-500"></span>
+          <span className="text-zinc-600 dark:text-zinc-400">Spotpris</span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500 sm:h-3 sm:w-3"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">
-            <span className="hidden sm:inline">Norgespris: </span><strong className="text-blue-600 dark:text-blue-400">50</strong><span className="hidden sm:inline"> øre</span>
-          </span>
+        <div className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 border-t-2 border-dashed border-blue-500"></span>
+          <span className="text-zinc-600 dark:text-zinc-400">Norgespris (50 øre)</span>
         </div>
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 sm:h-3 sm:w-3"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">
-            <span className="hidden sm:inline">Lavest: </span><strong className="text-emerald-600 dark:text-emerald-400">{minPrice}</strong><span className="hidden sm:inline"> øre</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 sm:h-3 sm:w-3"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">
-            <span className="hidden sm:inline">Høyest: </span><strong className="text-red-600 dark:text-red-400">{maxPrice}</strong><span className="hidden sm:inline"> øre</span>
-          </span>
+        <div className="ml-auto flex gap-3 text-zinc-500 dark:text-zinc-400">
+          <span>Lavest: <strong className="text-emerald-600 dark:text-emerald-400">{minPrice}</strong></span>
+          <span>Høyest: <strong className="text-red-600 dark:text-red-400">{maxPrice}</strong></span>
         </div>
       </div>
       
@@ -373,26 +369,93 @@ export default function SpotPriceChart({
       </div>
       
       {/* Current hour highlight - only show for today */}
-      {selectedDate === "today" && !error && (
-        <div className="mt-3 flex flex-col gap-2 rounded-xl bg-amber-50 px-3 py-2.5 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:bg-amber-950/30">
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 sm:h-10 sm:w-10 dark:bg-amber-900/50">
-              <span className="text-base sm:text-lg">⚡</span>
+      {selectedDate === "today" && !error && (() => {
+        const currentPrice = chartData.find(d => d.isCurrent)?.price || avgOre;
+        const isAboveNorgespris = currentPrice > NORGESPRIS_ORE;
+        const priceDiff = Math.abs(currentPrice - NORGESPRIS_ORE);
+        const cheapestHour = chartData.reduce((min, d) => d.price < min.price ? d : min, chartData[0]);
+        const hoursUntilCheapest = (cheapestHour.hourNum - currentHour + 24) % 24;
+        
+        return (
+          <div className="mt-3 space-y-3 sm:mt-4">
+            {/* Current price with context */}
+            <div className={`flex flex-col gap-2 rounded-xl px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 ${
+              isAboveNorgespris 
+                ? "bg-red-50 dark:bg-red-950/30" 
+                : "bg-emerald-50 dark:bg-emerald-950/30"
+            }`}>
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full sm:h-10 sm:w-10 ${
+                  isAboveNorgespris 
+                    ? "bg-red-100 dark:bg-red-900/50" 
+                    : "bg-emerald-100 dark:bg-emerald-900/50"
+                }`}>
+                  <span className="text-base sm:text-lg">{isAboveNorgespris ? "📈" : "✅"}</span>
+                </div>
+                <div>
+                  <p className={`text-xs font-medium sm:text-sm ${
+                    isAboveNorgespris 
+                      ? "text-red-900 dark:text-red-100" 
+                      : "text-emerald-900 dark:text-emerald-100"
+                  }`}>
+                    {isAboveNorgespris 
+                      ? `${priceDiff} øre dyrere enn Norgespris` 
+                      : currentPrice < NORGESPRIS_ORE 
+                        ? `${priceDiff} øre billigere enn Norgespris!`
+                        : "Lik Norgespris"}
+                  </p>
+                  <p className={`text-xs ${
+                    isAboveNorgespris 
+                      ? "text-red-700 dark:text-red-400" 
+                      : "text-emerald-700 dark:text-emerald-400"
+                  }`}>
+                    {isAboveNorgespris 
+                      ? "Vurder å utsette strømbruk hvis mulig" 
+                      : "Gunstig tidspunkt å bruke strøm"}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`text-xl font-bold sm:text-2xl ${
+                  isAboveNorgespris 
+                    ? "text-red-600 dark:text-red-400" 
+                    : "text-emerald-600 dark:text-emerald-400"
+                }`}>
+                  {currentPrice} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  kl {currentHour.toString().padStart(2, "0")}:00
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-amber-900 sm:text-sm dark:text-amber-100">
-                Pris nå (kl {currentHour.toString().padStart(2, "0")}:00)
-              </p>
-              <p className="hidden text-xs text-amber-700 sm:block dark:text-amber-400">
-                Oppdateres hver time fra Nord Pool
-              </p>
-            </div>
+
+            {/* Tip: Best time to use electricity */}
+            {isAboveNorgespris && hoursUntilCheapest > 0 && hoursUntilCheapest < 12 && (
+              <div className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs dark:bg-blue-950/30">
+                <span>💡</span>
+                <span className="text-blue-800 dark:text-blue-300">
+                  <strong>Tips:</strong> Billigst kl {cheapestHour.hour} ({cheapestHour.price} øre) – om {hoursUntilCheapest} time{hoursUntilCheapest > 1 ? "r" : ""}
+                </span>
+              </div>
+            )}
+
+            {/* Norgespris explanation */}
+            <details className="group rounded-lg border border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50">
+              <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                <span>ℹ️ Hva er Norgespris?</span>
+                <svg className="h-4 w-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </summary>
+              <div className="border-t border-zinc-200 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
+                <p><strong>Norgespris</strong> er en statlig støtteordning som gir deg fast strømpris på <strong>50 øre/kWh</strong> (inkl. mva).</p>
+                <p className="mt-1">Når spotprisen er over 50 øre, sparer du penger med Norgespris. Når den er under, er spotpris billigere.</p>
+                <p className="mt-1 text-zinc-500 dark:text-zinc-500">Ordningen gjelder bolig og hytte med forbrukstak.</p>
+              </div>
+            </details>
           </div>
-          <p className="text-xl font-bold text-amber-600 sm:text-2xl dark:text-amber-400">
-            {chartData.find(d => d.isCurrent)?.price || avgOre} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
-          </p>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Tomorrow info */}
       {selectedDate === "tomorrow" && !error && (
