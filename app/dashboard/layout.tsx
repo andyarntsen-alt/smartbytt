@@ -32,10 +32,10 @@ export default async function DashboardLayout({
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
       <DashboardSidebar />
 
-      <div className="flex flex-1 flex-col pl-64">
+      <div className="flex flex-1 flex-col lg:pl-64">
         <DashboardHeader user={user} profile={profile} />
 
-        <main className="flex-1 p-8">{children}</main>
+        <main className="flex-1 p-4 pt-16 sm:p-6 lg:p-8 lg:pt-8">{children}</main>
       </div>
     </div>
   );

@@ -33,8 +33,12 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/75 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/75">
-      <div className="flex h-16 items-center justify-between px-8">
-        <div>
+      <div className="flex h-14 items-center justify-between px-4 sm:h-16 sm:px-6 lg:px-8">
+        {/* Spacer for mobile hamburger */}
+        <div className="w-10 lg:hidden" />
+        
+        {/* Title - hidden on mobile */}
+        <div className="hidden lg:block">
           <h1 className="text-lg font-semibold dark:text-zinc-100">
             Hei, {displayName}! 👋
           </h1>
@@ -43,7 +47,12 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Mobile title */}
+        <h1 className="text-sm font-semibold lg:hidden dark:text-zinc-100">
+          SmartBytt
+        </h1>
+
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Notifications */}
           <div className="relative">
             <button

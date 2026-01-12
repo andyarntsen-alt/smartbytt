@@ -195,19 +195,19 @@ export default function SpotPriceChart({
   };
 
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="rounded-2xl border border-zinc-200 bg-white p-4 sm:p-5 dark:border-zinc-800 dark:bg-zinc-900">
       {/* Header with date selector */}
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-semibold dark:text-zinc-100">Spotpris time for time</h3>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{priceAreaName}</p>
+          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Spotpris time for time</h3>
+          <p className="text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">{priceAreaName}</p>
         </div>
         
-        {/* Date tabs */}
-        <div className="flex rounded-lg border border-zinc-200 p-1 dark:border-zinc-700">
+        {/* Date tabs - scrollable on mobile */}
+        <div className="flex w-full overflow-x-auto rounded-lg border border-zinc-200 p-1 sm:w-auto dark:border-zinc-700">
           <button
             onClick={() => handleDateChange("yesterday")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               selectedDate === "yesterday"
                 ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -217,7 +217,7 @@ export default function SpotPriceChart({
           </button>
           <button
             onClick={() => handleDateChange("today")}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               selectedDate === "today"
                 ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
@@ -228,7 +228,7 @@ export default function SpotPriceChart({
           <button
             onClick={() => handleDateChange("tomorrow")}
             disabled={!tomorrowAvailable}
-            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`shrink-0 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
               selectedDate === "tomorrow"
                 ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
                 : tomorrowAvailable
@@ -241,33 +241,30 @@ export default function SpotPriceChart({
         </div>
       </div>
 
-      {/* Stats row */}
-      <div className="mb-4 flex flex-wrap gap-4 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-emerald-500"></span>
+      {/* Stats row - stacked on mobile */}
+      <div className="mb-4 grid grid-cols-3 gap-2 text-xs sm:flex sm:flex-wrap sm:gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 sm:h-3 sm:w-3"></span>
           <span className="text-zinc-600 dark:text-zinc-400">
-            Lavest: <strong className="text-emerald-600 dark:text-emerald-400">{minPrice} øre</strong>
+            <span className="hidden sm:inline">Lavest: </span><strong className="text-emerald-600 dark:text-emerald-400">{minPrice}</strong><span className="hidden sm:inline"> øre</span>
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-amber-500"></span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 sm:h-3 sm:w-3"></span>
           <span className="text-zinc-600 dark:text-zinc-400">
-            Snitt: <strong className="text-amber-600 dark:text-amber-400">{avgOre} øre</strong>
+            <span className="hidden sm:inline">Snitt: </span><strong className="text-amber-600 dark:text-amber-400">{avgOre}</strong><span className="hidden sm:inline"> øre</span>
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-red-500"></span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500 sm:h-3 sm:w-3"></span>
           <span className="text-zinc-600 dark:text-zinc-400">
-            Høyest: <strong className="text-red-600 dark:text-red-400">{maxPrice} øre</strong>
+            <span className="hidden sm:inline">Høyest: </span><strong className="text-red-600 dark:text-red-400">{maxPrice}</strong><span className="hidden sm:inline"> øre</span>
           </span>
         </div>
-        <span className="ml-auto text-zinc-400 dark:text-zinc-500">
-          {getDateLabel(selectedDate)}
-        </span>
       </div>
       
-      {/* Chart */}
-      <div className="relative h-[200px] w-full">
+      {/* Chart - shorter on mobile */}
+      <div className="relative h-[160px] w-full sm:h-[200px]">
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-zinc-900/80">
             <div className="flex items-center gap-2 text-sm text-zinc-500">
@@ -282,7 +279,7 @@ export default function SpotPriceChart({
         
         {error ? (
           <div className="flex h-full items-center justify-center">
-            <div className="text-center">
+            <div className="text-center px-4">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
               {selectedDate === "tomorrow" && !tomorrowAvailable && (
                 <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
@@ -293,7 +290,7 @@ export default function SpotPriceChart({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
               <defs>
                 <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
@@ -302,17 +299,18 @@ export default function SpotPriceChart({
               </defs>
               <XAxis 
                 dataKey="hour" 
-                tick={{ fontSize: 10, fill: '#71717a' }}
+                tick={{ fontSize: 9, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={false}
-                interval={2}
+                interval={3}
               />
               <YAxis 
-                tick={{ fontSize: 10, fill: '#71717a' }}
+                tick={{ fontSize: 9, fill: '#71717a' }}
                 tickLine={false}
                 axisLine={false}
                 domain={[Math.floor(minPrice * 0.9), Math.ceil(maxPrice * 1.1)]}
                 tickFormatter={(value) => `${value}`}
+                width={30}
               />
               <Tooltip content={<CustomTooltip />} />
               <ReferenceLine 
@@ -335,7 +333,7 @@ export default function SpotPriceChart({
                         key={payload.hour}
                         cx={cx}
                         cy={cy}
-                        r={6}
+                        r={5}
                         fill="#f59e0b"
                         stroke="#fff"
                         strokeWidth={2}
@@ -344,7 +342,7 @@ export default function SpotPriceChart({
                   }
                   return <circle key={payload.hour} cx={cx} cy={cy} r={0} />;
                 }}
-                activeDot={{ r: 6, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -353,48 +351,48 @@ export default function SpotPriceChart({
       
       {/* Current hour highlight - only show for today */}
       {selectedDate === "today" && !error && (
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-amber-50 px-4 py-3 dark:bg-amber-950/30">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50">
-              <span className="text-lg">⚡</span>
+        <div className="mt-3 flex flex-col gap-2 rounded-xl bg-amber-50 px-3 py-2.5 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:bg-amber-950/30">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 sm:h-10 sm:w-10 dark:bg-amber-900/50">
+              <span className="text-base sm:text-lg">⚡</span>
             </div>
             <div>
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                Pris akkurat nå (kl {currentHour.toString().padStart(2, "0")}:00)
+              <p className="text-xs font-medium text-amber-900 sm:text-sm dark:text-amber-100">
+                Pris nå (kl {currentHour.toString().padStart(2, "0")}:00)
               </p>
-              <p className="text-xs text-amber-700 dark:text-amber-400">
+              <p className="hidden text-xs text-amber-700 sm:block dark:text-amber-400">
                 Oppdateres hver time fra Nord Pool
               </p>
             </div>
           </div>
-          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-            {chartData.find(d => d.isCurrent)?.price || avgOre} <span className="text-sm font-normal">øre/kWh</span>
+          <p className="text-xl font-bold text-amber-600 sm:text-2xl dark:text-amber-400">
+            {chartData.find(d => d.isCurrent)?.price || avgOre} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
           </p>
         </div>
       )}
 
       {/* Tomorrow info */}
       {selectedDate === "tomorrow" && !error && (
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3 dark:bg-blue-950/30">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
-              <span className="text-lg">📅</span>
+        <div className="mt-3 flex flex-col gap-2 rounded-xl bg-blue-50 px-3 py-2.5 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:bg-blue-950/30">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 sm:h-10 sm:w-10 dark:bg-blue-900/50">
+              <span className="text-base sm:text-lg">📅</span>
             </div>
             <div>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              <p className="text-xs font-medium text-blue-900 sm:text-sm dark:text-blue-100">
                 Morgendagens priser
               </p>
-              <p className="text-xs text-blue-700 dark:text-blue-400">
+              <p className="hidden text-xs text-blue-700 sm:block dark:text-blue-400">
                 Publisert i dag ca. kl 13:00
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-              Snitt: {avgOre} <span className="text-sm font-normal">øre/kWh</span>
+          <div className="flex items-baseline gap-2 sm:flex-col sm:items-end sm:gap-0">
+            <p className="text-base font-bold text-blue-600 sm:text-lg dark:text-blue-400">
+              {avgOre} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
             </p>
             <p className="text-xs text-blue-500 dark:text-blue-500">
-              {minPrice} - {maxPrice} øre
+              ({minPrice}–{maxPrice})
             </p>
           </div>
         </div>
@@ -402,26 +400,26 @@ export default function SpotPriceChart({
 
       {/* Yesterday info */}
       {selectedDate === "yesterday" && !error && (
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-zinc-100 px-4 py-3 dark:bg-zinc-800">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-700">
-              <span className="text-lg">📊</span>
+        <div className="mt-3 flex flex-col gap-2 rounded-xl bg-zinc-100 px-3 py-2.5 sm:mt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3 dark:bg-zinc-800">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-200 sm:h-10 sm:w-10 dark:bg-zinc-700">
+              <span className="text-base sm:text-lg">📊</span>
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+              <p className="text-xs font-medium text-zinc-700 sm:text-sm dark:text-zinc-200">
                 Gårsdagens priser
               </p>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="hidden text-xs text-zinc-500 sm:block dark:text-zinc-400">
                 Historiske data
               </p>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-lg font-bold text-zinc-700 dark:text-zinc-200">
-              Snitt: {avgOre} <span className="text-sm font-normal">øre/kWh</span>
+          <div className="flex items-baseline gap-2 sm:flex-col sm:items-end sm:gap-0">
+            <p className="text-base font-bold text-zinc-700 sm:text-lg dark:text-zinc-200">
+              {avgOre} <span className="text-xs font-normal sm:text-sm">øre/kWh</span>
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {minPrice} - {maxPrice} øre
+              ({minPrice}–{maxPrice})
             </p>
           </div>
         </div>
