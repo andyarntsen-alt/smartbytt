@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import DarkModeToggle from "./components/DarkModeToggle";
 import Header from "./components/Header";
+import WaitlistForm from "./components/WaitlistForm";
 
 export default function Home() {
   const year = new Date().getFullYear();
@@ -353,6 +354,34 @@ export default function Home() {
                   <p className="text-sm text-zinc-700 dark:text-zinc-300">{t}</p>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Waitlist Section */}
+      <section className="mx-auto max-w-6xl px-4 py-12 md:py-16" id="venteliste">
+        <div className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white p-8 md:p-10 dark:border-zinc-800 dark:bg-zinc-900">
+          <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-200/40 blur-3xl dark:bg-emerald-900/30" />
+          <div aria-hidden className="pointer-events-none absolute -left-24 -bottom-24 h-72 w-72 rounded-full bg-sky-200/40 blur-3xl dark:bg-sky-900/30" />
+
+          <div className="relative grid gap-8 md:grid-cols-2 md:items-center">
+            <div>
+              <h2 className="text-2xl font-semibold tracking-tight md:text-3xl dark:text-zinc-100">
+                Bli med på ventelisten
+              </h2>
+              <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
+                Vi lanserer snart! Meld deg på for å få tidlig tilgang og eksklusive tilbud.
+                Du er ikke forpliktet til noe.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <TrustPill>Gratis</TrustPill>
+                <TrustPill>Ingen spam</TrustPill>
+                <TrustPill>Tidlig tilgang</TrustPill>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-800/50">
+              <WaitlistForm />
             </div>
           </div>
         </div>
