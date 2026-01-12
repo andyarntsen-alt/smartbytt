@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -12,6 +14,14 @@ function isValidEmail(email: string): boolean {
 
 export async function POST(request: Request) {
   try {
+    // Return error if Supabase is not configured
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, message: "Database er ikke konfigurert. Kontakt administrator." },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { email, source = "landing" } = body;
 
