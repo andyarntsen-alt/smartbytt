@@ -28,7 +28,33 @@ export const metadata: Metadata = {
       { url: "/brand/smartbytt-icon-152.png", sizes: "152x152", type: "image/png" },
     ],
   },
+  openGraph: {
+    title: "SmartBytt – Spar penger på strøm, mobil og bredbånd",
+    description: "Last opp regningene dine og få bedre avtaler. SmartBytt analyserer og viser nøyaktig hva du kan spare.",
+    url: "https://smartbytt.no",
+    siteName: "SmartBytt",
+    locale: "nb_NO",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SmartBytt – Spar penger på strøm, mobil og bredbånd",
+    description: "Last opp regningene dine og få bedre avtaler.",
+  },
 };
+
+// Script to prevent flash of wrong theme
+const themeScript = `
+  (function() {
+    try {
+      var saved = localStorage.getItem('darkMode');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'true' || (saved === null && prefersDark)) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) {}
+  })();
+`;
 
 export default function RootLayout({
   children,
@@ -36,7 +62,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="no">
+    <html lang="no" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

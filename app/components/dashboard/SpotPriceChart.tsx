@@ -1,0 +1,431 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+
+interface HourlyPrice {
+  NOK_per_kWh: number;
+  time_start: string;
+  time_end: string;
+}
+
+interface DailyPrices {
+  prices: HourlyPrice[];
+  average: number;
+  min: number;
+  max: number;
+  date: string;
+}
+
+interface SpotPriceChartProps {
+  initialPrices: HourlyPrice[];
+  initialAverage: number;
+  priceAreaName: string;
+  priceArea: string;
+}
+
+type DateOption = "yesterday" | "today" | "tomorrow";
+
+export default function SpotPriceChart({ 
+  initialPrices, 
+  initialAverage, 
+  priceAreaName,
+  priceArea 
+}: SpotPriceChartProps) {
+  const [selectedDate, setSelectedDate] = useState<DateOption>("today");
+  const [prices, setPrices] = useState<HourlyPrice[]>(initialPrices);
+  const [average, setAverage] = useState(initialAverage);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [tomorrowAvailable, setTomorrowAvailable] = useState(true);
+  
+  const currentHour = new Date().getHours();
+
+  // Fetch prices for a specific date
+  const fetchPricesForDate = async (dateOption: DateOption) => {
+    const today = new Date();
+    let targetDate = new Date(today);
+    
+    if (dateOption === "yesterday") {
+      targetDate.setDate(today.getDate() - 1);
+    } else if (dateOption === "tomorrow") {
+      targetDate.setDate(today.getDate() + 1);
+    }
+    
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+    const day = String(targetDate.getDate()).padStart(2, "0");
+    
+    const url = `https://www.hvakosterstrommen.no/api/v1/prices/${year}/${month}-${day}_${priceArea}.json`;
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        if (dateOption === "tomorrow") {
+          setTomorrowAvailable(false);
+          setError("Morgendagens priser er ikke publisert ennå (kommer ca. kl 13:00)");
+        } else {
+          setError("Kunne ikke hente priser");
+        }
+        return;
+      }
+      
+      const data: HourlyPrice[] = await response.json();
+      
+      if (!data || data.length === 0) {
+        setError("Ingen prisdata tilgjengelig");
+        return;
+      }
+      
+      // Calculate average
+      const avg = data.reduce((sum, p) => sum + p.NOK_per_kWh, 0) / data.length;
+      
+      setPrices(data);
+      setAverage(avg);
+      if (dateOption === "tomorrow") {
+        setTomorrowAvailable(true);
+      }
+    } catch (err) {
+      setError("Feil ved henting av priser");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle date change
+  const handleDateChange = (dateOption: DateOption) => {
+    setSelectedDate(dateOption);
+    
+    if (dateOption === "today") {
+      // Use initial data for today
+      setPrices(initialPrices);
+      setAverage(initialAverage);
+      setError(null);
+    } else {
+      fetchPricesForDate(dateOption);
+    }
+  };
+
+  // Check if tomorrow's prices are available on mount
+  useEffect(() => {
+    const checkTomorrow = async () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const year = tomorrow.getFullYear();
+      const month = String(tomorrow.getMonth() + 1).padStart(2, "0");
+      const day = String(tomorrow.getDate()).padStart(2, "0");
+      
+      try {
+        const response = await fetch(
+          `https://www.hvakosterstrommen.no/api/v1/prices/${year}/${month}-${day}_${priceArea}.json`,
+          { method: "HEAD" }
+        );
+        setTomorrowAvailable(response.ok);
+      } catch {
+        setTomorrowAvailable(false);
+      }
+    };
+    
+    checkTomorrow();
+  }, [priceArea]);
+
+  // Transform data for the chart
+  const chartData = prices.map((price) => {
+    const hour = new Date(price.time_start).getHours();
+    const priceOre = Math.round(price.NOK_per_kWh * 100);
+    
+    return {
+      hour: `${hour.toString().padStart(2, "0")}:00`,
+      hourNum: hour,
+      price: priceOre,
+      isCurrent: selectedDate === "today" && hour === currentHour,
+    };
+  });
+
+  // Find min and max for better visualization
+  const minPrice = chartData.length > 0 ? Math.min(...chartData.map(d => d.price)) : 0;
+  const maxPrice = chartData.length > 0 ? Math.max(...chartData.map(d => d.price)) : 100;
+  const avgOre = Math.round(average * 100);
+
+  // Get date label
+  const getDateLabel = (option: DateOption) => {
+    const today = new Date();
+    const targetDate = new Date(today);
+    
+    if (option === "yesterday") {
+      targetDate.setDate(today.getDate() - 1);
+    } else if (option === "tomorrow") {
+      targetDate.setDate(today.getDate() + 1);
+    }
+    
+    return targetDate.toLocaleDateString("nb-NO", { weekday: "short", day: "numeric", month: "short" });
+  };
+
+  // Custom tooltip
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
+    if (active && payload && payload.length) {
+      const data = chartData.find(d => d.hour === label);
+      const isCurrent = data?.isCurrent;
+      
+      return (
+        <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+            {label} {isCurrent && "(nå)"}
+          </p>
+          <p className="text-lg font-bold text-amber-600 dark:text-amber-400">
+            {payload[0].value} øre/kWh
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      {/* Header with date selector */}
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="font-semibold dark:text-zinc-100">Spotpris time for time</h3>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{priceAreaName}</p>
+        </div>
+        
+        {/* Date tabs */}
+        <div className="flex rounded-lg border border-zinc-200 p-1 dark:border-zinc-700">
+          <button
+            onClick={() => handleDateChange("yesterday")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              selectedDate === "yesterday"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            I går
+          </button>
+          <button
+            onClick={() => handleDateChange("today")}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              selectedDate === "today"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            I dag
+          </button>
+          <button
+            onClick={() => handleDateChange("tomorrow")}
+            disabled={!tomorrowAvailable}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              selectedDate === "tomorrow"
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : tomorrowAvailable
+                  ? "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                  : "cursor-not-allowed text-zinc-300 dark:text-zinc-600"
+            }`}
+          >
+            I morgen {!tomorrowAvailable && "🕐"}
+          </button>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="mb-4 flex flex-wrap gap-4 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-emerald-500"></span>
+          <span className="text-zinc-600 dark:text-zinc-400">
+            Lavest: <strong className="text-emerald-600 dark:text-emerald-400">{minPrice} øre</strong>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-amber-500"></span>
+          <span className="text-zinc-600 dark:text-zinc-400">
+            Snitt: <strong className="text-amber-600 dark:text-amber-400">{avgOre} øre</strong>
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded-full bg-red-500"></span>
+          <span className="text-zinc-600 dark:text-zinc-400">
+            Høyest: <strong className="text-red-600 dark:text-red-400">{maxPrice} øre</strong>
+          </span>
+        </div>
+        <span className="ml-auto text-zinc-400 dark:text-zinc-500">
+          {getDateLabel(selectedDate)}
+        </span>
+      </div>
+      
+      {/* Chart */}
+      <div className="relative h-[200px] w-full">
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-zinc-900/80">
+            <div className="flex items-center gap-2 text-sm text-zinc-500">
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Henter priser...
+            </div>
+          </div>
+        )}
+        
+        {error ? (
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <p className="text-sm text-zinc-500 dark:text-zinc-400">{error}</p>
+              {selectedDate === "tomorrow" && !tomorrowAvailable && (
+                <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                  Nord Pool publiserer morgendagens priser ca. kl 13:00
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis 
+                dataKey="hour" 
+                tick={{ fontSize: 10, fill: '#71717a' }}
+                tickLine={false}
+                axisLine={false}
+                interval={2}
+              />
+              <YAxis 
+                tick={{ fontSize: 10, fill: '#71717a' }}
+                tickLine={false}
+                axisLine={false}
+                domain={[Math.floor(minPrice * 0.9), Math.ceil(maxPrice * 1.1)]}
+                tickFormatter={(value) => `${value}`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <ReferenceLine 
+                y={avgOre} 
+                stroke="#f59e0b" 
+                strokeDasharray="4 4" 
+                strokeOpacity={0.6}
+              />
+              <Area
+                type="monotone"
+                dataKey="price"
+                stroke="#f59e0b"
+                strokeWidth={2}
+                fill="url(#priceGradient)"
+                dot={(props) => {
+                  const { cx, cy, payload } = props;
+                  if (payload.isCurrent) {
+                    return (
+                      <circle
+                        key={payload.hour}
+                        cx={cx}
+                        cy={cy}
+                        r={6}
+                        fill="#f59e0b"
+                        stroke="#fff"
+                        strokeWidth={2}
+                      />
+                    );
+                  }
+                  return <circle key={payload.hour} cx={cx} cy={cy} r={0} />;
+                }}
+                activeDot={{ r: 6, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+      
+      {/* Current hour highlight - only show for today */}
+      {selectedDate === "today" && !error && (
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-amber-50 px-4 py-3 dark:bg-amber-950/30">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/50">
+              <span className="text-lg">⚡</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                Pris akkurat nå (kl {currentHour.toString().padStart(2, "0")}:00)
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400">
+                Oppdateres hver time fra Nord Pool
+              </p>
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            {chartData.find(d => d.isCurrent)?.price || avgOre} <span className="text-sm font-normal">øre/kWh</span>
+          </p>
+        </div>
+      )}
+
+      {/* Tomorrow info */}
+      {selectedDate === "tomorrow" && !error && (
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3 dark:bg-blue-950/30">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/50">
+              <span className="text-lg">📅</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                Morgendagens priser
+              </p>
+              <p className="text-xs text-blue-700 dark:text-blue-400">
+                Publisert i dag ca. kl 13:00
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+              Snitt: {avgOre} <span className="text-sm font-normal">øre/kWh</span>
+            </p>
+            <p className="text-xs text-blue-500 dark:text-blue-500">
+              {minPrice} - {maxPrice} øre
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Yesterday info */}
+      {selectedDate === "yesterday" && !error && (
+        <div className="mt-4 flex items-center justify-between rounded-xl bg-zinc-100 px-4 py-3 dark:bg-zinc-800">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-200 dark:bg-zinc-700">
+              <span className="text-lg">📊</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                Gårsdagens priser
+              </p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Historiske data
+              </p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-lg font-bold text-zinc-700 dark:text-zinc-200">
+              Snitt: {avgOre} <span className="text-sm font-normal">øre/kWh</span>
+            </p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {minPrice} - {maxPrice} øre
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
