@@ -35,6 +35,7 @@ const MVA_RATE = 1.25; // 25% VAT
 const STROMSTOTTE_THRESHOLD_EKS_MVA = 77; // øre/kWh for NO4 (no VAT)
 const STROMSTOTTE_THRESHOLD_INKL_MVA = 96.25; // øre/kWh for other areas
 const STROMSTOTTE_COVERAGE = 0.90; // 90% coverage above threshold
+const NORGESPRIS = 50; // Fixed price alternative (50 øre inkl mva, 40 øre for NO4)
 
 export default function SpotPriceChart({ 
   initialPrices, 
@@ -137,6 +138,10 @@ export default function SpotPriceChart({
   const totalSupport = chartData.reduce((s, d) => s + d.support, 0);
   const maxSpot = Math.max(...chartData.map(d => d.spot));
   const minYouPay = Math.min(...chartData.map(d => d.youPay));
+  
+  // Norgespris comparison (50 øre inkl mva, 40 øre for NO4)
+  const norgesprisRate = isNordNorge ? 40 : NORGESPRIS;
+  const norgesprisDiff = avg - norgesprisRate; // Positive = Norgespris is cheaper
 
   // Tooltip
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: typeof chartData[0] }> }) => {
@@ -214,13 +219,33 @@ export default function SpotPriceChart({
         </div>
       )}
 
-      {/* Strømstøtte savings */}
-      {totalSupport > 100 && selectedDate === "today" && !error && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
-          <span>💰</span>
-          <p className="text-sm text-emerald-700 dark:text-emerald-300">
-            Du sparer ca. <strong>{Math.round(totalSupport / 100)} kr</strong> i strømstøtte i dag
-          </p>
+      {/* Strømstøtte savings + Norgespris comparison */}
+      {selectedDate === "today" && !error && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {totalSupport > 100 && (
+            <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
+              <span>💰</span>
+              <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                Strømstøtte: <strong>~{Math.round(totalSupport / 100)} kr</strong> spart
+              </p>
+            </div>
+          )}
+          <div className={`flex items-center gap-2 rounded-lg px-3 py-2 ${
+            norgesprisDiff > 10 
+              ? "bg-blue-50 dark:bg-blue-950/30" 
+              : "bg-zinc-100 dark:bg-zinc-800"
+          }`}>
+            <span>🇳🇴</span>
+            <p className={`text-sm ${
+              norgesprisDiff > 10 
+                ? "text-blue-700 dark:text-blue-300" 
+                : "text-zinc-600 dark:text-zinc-400"
+            }`}>
+              Norgespris: <strong>{norgesprisRate} øre</strong>
+              {norgesprisDiff > 5 && <span className="ml-1 text-xs">({norgesprisDiff} øre billigere)</span>}
+              {norgesprisDiff < -5 && <span className="ml-1 text-xs">({Math.abs(norgesprisDiff)} øre dyrere)</span>}
+            </p>
+          </div>
         </div>
       )}
 
@@ -255,10 +280,19 @@ export default function SpotPriceChart({
                 tick={{ fontSize: 9, fill: '#71717a' }} 
                 tickLine={false} 
                 axisLine={false} 
-                domain={[Math.floor(minYouPay * 0.85), Math.ceil(maxSpot * 1.05)]}
+                domain={[Math.min(NORGESPRIS - 5, Math.floor(minYouPay * 0.85)), Math.ceil(maxSpot * 1.05)]}
                 width={35}
               />
               <Tooltip content={<CustomTooltip />} />
+              
+              {/* Norgespris - blue dashed line at 50 øre */}
+              <ReferenceLine 
+                y={isNordNorge ? 40 : NORGESPRIS} 
+                stroke="#3b82f6" 
+                strokeDasharray="4 4" 
+                strokeWidth={1.5} 
+                strokeOpacity={0.6}
+              />
               
               {/* Strømstøtte threshold */}
               <ReferenceLine 
@@ -299,15 +333,15 @@ export default function SpotPriceChart({
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
         <span className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-zinc-400"></span> Spotpris
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-1 w-4 rounded bg-amber-400"></span> Du betaler (etter støtte)
+          <span className="h-1 w-4 rounded bg-amber-400"></span> Du betaler
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 border-t border-dashed border-emerald-500"></span> Støttegrense
+          <span className="h-0.5 w-4 border-t border-dashed border-blue-500"></span> 🇳🇴 Norgespris ({isNordNorge ? 40 : 50} øre)
         </span>
       </div>
 
