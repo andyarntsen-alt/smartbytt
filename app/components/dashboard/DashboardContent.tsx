@@ -72,20 +72,32 @@ export default function DashboardContent({
         {/* Electricity Price Card - shows what you actually pay */}
         {(() => {
           // Strømstøtte constants (Jan 2026)
-          const THRESHOLD = priceArea === "NO4" ? 77 : 96; // NO4 has no VAT
-          const calcAfterSupport = (ore: number) => 
-            ore <= THRESHOLD ? ore : Math.round(ore - (ore - THRESHOLD) * 0.9);
+          // API prices are EXCLUDING VAT - we must add 25% for non-NO4 areas
+          const MVA_RATE = 1.25;
+          const isNordNorge = priceArea === "NO4";
+          const THRESHOLD = isNordNorge ? 77 : 96.25; // 77 øre eks mva = 96.25 øre inkl mva
           
-          // Get current hour's price
+          const calcAfterSupport = (oreInklMva: number) => {
+            if (oreInklMva <= THRESHOLD) return oreInklMva;
+            const support = (oreInklMva - THRESHOLD) * 0.9;
+            return Math.round(oreInklMva - support);
+          };
+          
+          // Get current hour's price from API (prices are EKS mva)
           const currentHour = new Date().getHours();
           const currentHourPrice = spotPrices?.prices?.find(p => {
             const h = new Date(p.time_start).getHours();
             return h === currentHour;
           });
           
-          const spotOre = currentHourPrice 
-            ? Math.round(currentHourPrice.NOK_per_kWh * 100) 
-            : spotPrices ? Math.round(spotPrices.average * 100) : null;
+          // Convert API price (eks mva) to display price (inkl mva for non-NO4)
+          const priceEksMva = currentHourPrice 
+            ? currentHourPrice.NOK_per_kWh * 100 
+            : spotPrices ? spotPrices.average * 100 : null;
+          
+          const spotOre = priceEksMva 
+            ? Math.round(isNordNorge ? priceEksMva : priceEksMva * MVA_RATE) 
+            : null;
           
           const youPay = spotOre ? calcAfterSupport(spotOre) : null;
           const support = spotOre && youPay ? spotOre - youPay : 0;

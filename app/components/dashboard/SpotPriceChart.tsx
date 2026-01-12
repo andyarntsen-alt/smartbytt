@@ -29,9 +29,12 @@ interface SpotPriceChartProps {
 type DateOption = "yesterday" | "today" | "tomorrow";
 
 // Constants for Norwegian electricity pricing (January 2026)
-const STROMSTOTTE_THRESHOLD_EKS_MVA = 77;
-const STROMSTOTTE_THRESHOLD_INKL_MVA = 96;
-const STROMSTOTTE_COVERAGE = 0.90;
+// API from hvakosterstrommen.no gives prices EXCLUDING VAT
+// Strømstøtte threshold: 77 øre eks mva = 96.25 øre inkl mva
+const MVA_RATE = 1.25; // 25% VAT
+const STROMSTOTTE_THRESHOLD_EKS_MVA = 77; // øre/kWh for NO4 (no VAT)
+const STROMSTOTTE_THRESHOLD_INKL_MVA = 96.25; // øre/kWh for other areas
+const STROMSTOTTE_COVERAGE = 0.90; // 90% coverage above threshold
 
 export default function SpotPriceChart({ 
   initialPrices, 
@@ -100,14 +103,22 @@ export default function SpotPriceChart({
     check();
   }, [priceArea]);
 
-  // Calculate price after support
-  const calcAfterSupport = (ore: number) => ore <= supportThreshold ? ore : Math.round(ore - (ore - supportThreshold) * STROMSTOTTE_COVERAGE);
+  // Calculate price after strømstøtte
+  // Formula: støtte = (pris_inkl_mva - 96.25) × 0.90 for non-NO4
+  // For NO4 (no VAT): støtte = (pris_eks_mva - 77) × 0.90
+  const calcAfterSupport = (oreInklMva: number) => {
+    if (oreInklMva <= supportThreshold) return oreInklMva;
+    const support = (oreInklMva - supportThreshold) * STROMSTOTTE_COVERAGE;
+    return Math.round((oreInklMva - support) * 10) / 10; // Round to 1 decimal
+  };
 
-  // Transform data
+  // Transform data - API prices are EXCLUDING VAT
   const chartData = prices.map((p) => {
     const hour = new Date(p.time_start).getHours();
-    const spot = Math.round(p.NOK_per_kWh * 100);
-    const youPay = calcAfterSupport(spot);
+    const priceEksMva = p.NOK_per_kWh * 100; // Convert to øre
+    // Add 25% VAT for non-NO4 areas, NO4 has 0% VAT
+    const spot = Math.round(isNordNorge ? priceEksMva : priceEksMva * MVA_RATE);
+    const youPay = Math.round(calcAfterSupport(spot));
     return {
       hour: `${hour.toString().padStart(2, "0")}:00`,
       hourNum: hour,
