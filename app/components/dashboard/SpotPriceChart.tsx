@@ -184,12 +184,12 @@ export default function SpotPriceChart({
     };
   });
 
-  // Find min and max for better visualization (using price with VAT)
+  // Find min and max for better visualization
   const minPrice = chartData.length > 0 ? Math.min(...chartData.map(d => d.price)) : 0;
   const maxPrice = chartData.length > 0 ? Math.max(...chartData.map(d => d.price)) : 100;
   const minPriceAfterSupport = chartData.length > 0 ? Math.min(...chartData.map(d => d.priceAfterSupport)) : 0;
   const maxPriceAfterSupport = chartData.length > 0 ? Math.max(...chartData.map(d => d.priceAfterSupport)) : 100;
-  const avgOre = Math.round(average * 100 * MVA_RATE); // Average WITH VAT
+  const avgOre = Math.round(average * 100); // Average (API already includes VAT)
   const avgAfterSupport = calculatePriceAfterSupport(avgOre);
 
   // Get date label
