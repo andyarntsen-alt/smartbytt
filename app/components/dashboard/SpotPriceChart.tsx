@@ -9,6 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Line,
+  ComposedChart,
 } from "recharts";
 
 interface HourlyPrice {
@@ -122,8 +124,8 @@ export default function SpotPriceChart({
   const expensive = chartData.reduce((max, d) => d.youPay > max.youPay ? d : max, chartData[0]);
   const avg = Math.round(chartData.reduce((s, d) => s + d.youPay, 0) / chartData.length);
   const totalSupport = chartData.reduce((s, d) => s + d.support, 0);
-  const minY = Math.min(...chartData.map(d => d.youPay));
-  const maxY = Math.max(...chartData.map(d => d.youPay));
+  const maxSpot = Math.max(...chartData.map(d => d.spot));
+  const minYouPay = Math.min(...chartData.map(d => d.youPay));
 
   // Tooltip
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: typeof chartData[0] }> }) => {
@@ -132,12 +134,21 @@ export default function SpotPriceChart({
     return (
       <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          {d.hour} {d.isCurrent && <span className="text-amber-500 font-medium">• Nå</span>}
+          Kl {d.hour} {d.isCurrent && <span className="text-amber-500 font-medium">• Nå</span>}
         </p>
-        <p className={`text-xl font-bold ${d.youPay < 60 ? "text-emerald-600" : d.youPay > 120 ? "text-red-600" : "text-zinc-900 dark:text-zinc-100"}`}>
-          {d.youPay} øre
-        </p>
-        {d.support > 0 && <p className="text-xs text-emerald-600">Støtte: -{d.support} øre</p>}
+        <div className="mt-1 space-y-1">
+          <p className="text-sm text-zinc-400 dark:text-zinc-500">
+            Spotpris: <span className="text-zinc-600 dark:text-zinc-300">{d.spot} øre</span>
+          </p>
+          <p className={`text-lg font-bold ${d.youPay < 100 ? "text-emerald-600" : d.youPay > 115 ? "text-red-600" : "text-amber-600"}`}>
+            Du betaler: {d.youPay} øre
+          </p>
+          {d.support > 0 && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              💰 Strømstøtte: -{d.support} øre
+            </p>
+          )}
+        </div>
       </div>
     );
   };
@@ -148,7 +159,7 @@ export default function SpotPriceChart({
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Strømpris i dag</h3>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">{priceAreaName} • Etter strømstøtte</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">{priceAreaName}</p>
         </div>
         <div className="flex rounded-lg border border-zinc-200 p-1 dark:border-zinc-700">
           {(["yesterday", "today", "tomorrow"] as const).map((opt) => (
@@ -203,7 +214,7 @@ export default function SpotPriceChart({
       )}
 
       {/* Chart */}
-      <div className="relative h-[160px] w-full sm:h-[200px]">
+      <div className="relative h-[180px] w-full sm:h-[220px]">
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80 dark:bg-zinc-900/80">
             <div className="flex items-center gap-2 text-sm text-zinc-500">
@@ -221,11 +232,11 @@ export default function SpotPriceChart({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                <linearGradient id="youPayGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
                 </linearGradient>
               </defs>
               <XAxis dataKey="hour" tick={{ fontSize: 9, fill: '#71717a' }} tickLine={false} axisLine={false} interval={3} />
@@ -233,17 +244,37 @@ export default function SpotPriceChart({
                 tick={{ fontSize: 9, fill: '#71717a' }} 
                 tickLine={false} 
                 axisLine={false} 
-                domain={[Math.floor(minY * 0.8), Math.ceil(maxY * 1.15)]}
-                width={30}
+                domain={[Math.floor(minYouPay * 0.85), Math.ceil(maxSpot * 1.05)]}
+                width={35}
               />
               <Tooltip content={<CustomTooltip />} />
-              <ReferenceLine y={supportThreshold} stroke="#10b981" strokeDasharray="6 3" strokeWidth={1.5} strokeOpacity={0.6} />
+              
+              {/* Strømstøtte threshold */}
+              <ReferenceLine 
+                y={supportThreshold} 
+                stroke="#10b981" 
+                strokeDasharray="6 3" 
+                strokeWidth={1.5} 
+                strokeOpacity={0.5}
+              />
+              
+              {/* Spotpris - gray line */}
+              <Line
+                type="monotone"
+                dataKey="spot"
+                stroke="#a1a1aa"
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{ r: 4, fill: "#a1a1aa", stroke: "#fff", strokeWidth: 2 }}
+              />
+              
+              {/* Du betaler - amber filled area */}
               <Area
                 type="monotone"
                 dataKey="youPay"
                 stroke="#f59e0b"
-                strokeWidth={2}
-                fill="url(#gradient)"
+                strokeWidth={2.5}
+                fill="url(#youPayGradient)"
                 dot={(props) => {
                   const { cx, cy, payload } = props;
                   if (!payload.isCurrent) return <circle key={payload.hourNum} r={0} />;
@@ -251,23 +282,26 @@ export default function SpotPriceChart({
                 }}
                 activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
               />
-            </AreaChart>
+            </ComposedChart>
           </ResponsiveContainer>
         )}
       </div>
 
       {/* Legend */}
-      <div className="mt-2 flex items-center justify-center gap-4 text-[10px] text-zinc-400 dark:text-zinc-500">
-        <span className="flex items-center gap-1">
-          <span className="h-0.5 w-3 bg-amber-500"></span> Pris etter støtte
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
+        <span className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 bg-zinc-400"></span> Spotpris
         </span>
-        <span className="flex items-center gap-1">
-          <span className="h-0.5 w-3 border-t border-dashed border-emerald-500"></span> Støttegrense ({supportThreshold} øre)
+        <span className="flex items-center gap-1.5">
+          <span className="h-1 w-4 rounded bg-amber-400"></span> Du betaler (etter støtte)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 border-t border-dashed border-emerald-500"></span> Støttegrense
         </span>
       </div>
 
       {/* Tips */}
-      {selectedDate === "today" && current && !error && cheapest.hourNum > currentHour && current.youPay - cheapest.youPay > 15 && (
+      {selectedDate === "today" && current && !error && cheapest.hourNum > currentHour && current.youPay - cheapest.youPay > 10 && (
         <div className="mt-3 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs dark:bg-blue-950/30">
           <span>💡</span>
           <span className="text-blue-700 dark:text-blue-300">
@@ -282,7 +316,7 @@ export default function SpotPriceChart({
           <span>ℹ️ Om strømstøtten</span>
         </summary>
         <p className="mt-2 text-[10px] text-zinc-400 dark:text-zinc-500">
-          Staten dekker 90% over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre (eks. mva). Alternativ: Norgespris (fast 50 øre) via Elhub.
+          Staten dekker 90% over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre (eks. mva) = {supportThreshold} øre (inkl. mva). Alternativ: Norgespris (fast 50 øre) via Elhub.
         </p>
       </details>
     </div>
