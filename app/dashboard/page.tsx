@@ -2,7 +2,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getConnector } from "@/lib/connectors/registry";
-import { fetchSpotPrices, fetchNationalAveragePrice, type PriceArea, PRICE_AREA_NAMES } from "@/lib/api/electricity-prices";
+import { fetchSpotPrices, type PriceArea, PRICE_AREA_NAMES } from "@/lib/api/electricity-prices";
 import SpotPriceChart from "@/app/components/dashboard/SpotPriceChart";
 
 export const dynamic = "force-dynamic";
@@ -88,10 +88,7 @@ export default async function DashboardPage() {
 
   // Fetch real spot prices
   const priceArea = (electricityContract?.price_area || "NO1") as PriceArea;
-  const [spotPrices, nationalAverage] = await Promise.all([
-    fetchSpotPrices(new Date(), priceArea),
-    fetchNationalAveragePrice(new Date())
-  ]);
+  const spotPrices = await fetchSpotPrices(new Date(), priceArea);
 
   // Get greeting based on time
   const hour = new Date().getHours();
@@ -145,11 +142,9 @@ export default async function DashboardPage() {
               <span className="text-amber-700 dark:text-amber-400">
                 Høy: <strong>{Math.round(spotPrices.max * 100)}</strong> øre
               </span>
-              {nationalAverage && (
-                <span className="text-blue-700 dark:text-blue-400">
-                  🇳🇴 Norge: <strong>{Math.round(nationalAverage * 100)}</strong> øre
-                </span>
-              )}
+              <span className="text-blue-700 dark:text-blue-400" title="Statlig ordning: fast pris 50 øre/kWh">
+                🇳🇴 Norgespris: <strong>50</strong> øre
+              </span>
             </div>
           )}
         </div>
@@ -376,7 +371,6 @@ export default async function DashboardPage() {
             initialAverage={spotPrices.average}
             priceAreaName={PRICE_AREA_NAMES[priceArea]}
             priceArea={priceArea}
-            initialNationalAverage={nationalAverage ?? undefined}
           />
         </div>
       )}
