@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import type { Profile } from "@/lib/supabase/types";
+import { useLanguage } from "@/app/components/LanguageToggle";
+import LanguageToggle from "@/app/components/LanguageToggle";
 
 interface HeaderProps {
   user: User;
@@ -13,6 +15,7 @@ interface HeaderProps {
 
 export default function DashboardHeader({ user, profile }: HeaderProps) {
   const router = useRouter();
+  const { language } = useLanguage();
   const [showMenu, setShowMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -23,13 +26,24 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
     router.refresh();
   };
 
-  const displayName = profile?.full_name || user.email?.split("@")[0] || "Bruker";
+  const defaultName = language === "no" ? "Bruker" : "User";
+  const displayName = profile?.full_name || user.email?.split("@")[0] || defaultName;
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const t = {
+    hi: language === "no" ? "Hei" : "Hi",
+    welcome: language === "no" ? "Velkommen til din spareoversikt" : "Welcome to your savings overview",
+    notifications: language === "no" ? "Varsler" : "Notifications",
+    newTip: language === "no" ? "Nytt sparetips!" : "New savings tip!",
+    tipDesc: language === "no" ? "Du kan spare opptil 220 kr/mnd på strøm" : "You can save up to 220 kr/mo on electricity",
+    settings: language === "no" ? "Innstillinger" : "Settings",
+    logout: language === "no" ? "Logg ut" : "Log out",
+  };
 
   return (
     <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/75 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/75">
@@ -40,10 +54,10 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
         {/* Title - hidden on mobile */}
         <div className="hidden lg:block">
           <h1 className="text-lg font-semibold dark:text-zinc-100">
-            Hei, {displayName}! 👋
+            {t.hi}, {displayName}! 👋
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Velkommen til din spareoversikt
+            {t.welcome}
           </p>
         </div>
 
@@ -53,6 +67,9 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
         </h1>
 
         <div className="flex items-center gap-2 sm:gap-4">
+          {/* Language Toggle */}
+          <LanguageToggle />
+
           {/* Notifications */}
           <div className="relative">
             <button
@@ -73,14 +90,14 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
 
             {showNotifications && (
               <div className="absolute right-0 top-full mt-2 w-80 rounded-2xl border border-zinc-200 bg-white p-4 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
-                <p className="text-sm font-medium dark:text-zinc-100">Varsler</p>
+                <p className="text-sm font-medium dark:text-zinc-100">{t.notifications}</p>
                 <div className="mt-3 space-y-3">
                   <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-900/20">
                     <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                      Nytt sparetips!
+                      {t.newTip}
                     </p>
                     <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-500">
-                      Du kan spare opptil 220 kr/mnd på strøm
+                      {t.tipDesc}
                     </p>
                   </div>
                 </div>
@@ -123,7 +140,7 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
                     href="/dashboard/innstillinger"
                     className="block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                   >
-                    Innstillinger
+                    {t.settings}
                   </a>
                 </div>
                 <div className="border-t border-zinc-200 py-1 dark:border-zinc-700">
@@ -131,7 +148,7 @@ export default function DashboardHeader({ user, profile }: HeaderProps) {
                     onClick={handleSignOut}
                     className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-zinc-100 dark:text-red-400 dark:hover:bg-zinc-700"
                   >
-                    Logg ut
+                    {t.logout}
                   </button>
                 </div>
               </div>

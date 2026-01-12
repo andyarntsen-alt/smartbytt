@@ -5,9 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useLanguage } from "@/app/components/LanguageToggle";
+import { authTranslations } from "@/lib/translations";
+import LanguageToggle from "@/app/components/LanguageToggle";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { language } = useLanguage();
+  const t = authTranslations[language].register;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,13 +28,13 @@ export default function RegisterPage() {
     setLoading(true);
 
     if (password !== confirmPassword) {
-      setError("Passordene matcher ikke");
+      setError(t.errorPasswordMismatch);
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError("Passordet må være minst 6 tegn");
+      setError(t.errorPasswordTooShort);
       setLoading(false);
       return;
     }
@@ -48,9 +53,9 @@ export default function RegisterPage() {
 
     if (error) {
       if (error.message.includes("already registered")) {
-        setError("Denne e-postadressen er allerede registrert");
+        setError(t.errorEmailExists);
       } else {
-        setError("Noe gikk galt. Prøv igjen.");
+        setError(t.errorGeneric);
       }
       setLoading(false);
       return;
@@ -62,6 +67,9 @@ export default function RegisterPage() {
   if (success) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+        <div className="absolute right-4 top-4">
+          <LanguageToggle />
+        </div>
         <div className="w-full max-w-md">
           <div className="mb-8 flex justify-center">
             <Link href="/" className="flex items-center gap-2.5">
@@ -95,17 +103,17 @@ export default function RegisterPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-semibold tracking-tight dark:text-zinc-100">
-              Sjekk e-posten din
+              {t.successTitle}
             </h1>
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Vi har sendt en bekreftelseslenke til <strong>{email}</strong>.
-              Klikk på lenken for å aktivere kontoen din.
+              {t.successMessage} <strong>{email}</strong>.
+              {" "}{t.successNote}
             </p>
             <Link
               href="/login"
               className="mt-6 block w-full rounded-xl border border-zinc-300 bg-white py-3 text-center text-sm font-medium text-zinc-900 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
             >
-              Tilbake til innlogging
+              {t.backToLogin}
             </Link>
           </div>
         </div>
@@ -115,6 +123,9 @@ export default function RegisterPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
+      <div className="absolute right-4 top-4">
+        <LanguageToggle />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-8 flex justify-center">
           <Link href="/" className="flex items-center gap-2.5">
@@ -133,10 +144,10 @@ export default function RegisterPage() {
 
         <div className="rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           <h1 className="text-2xl font-semibold tracking-tight dark:text-zinc-100">
-            Opprett konto
+            {t.title}
           </h1>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Registrer deg for å begynne å spare penger
+            {t.subtitle}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -151,7 +162,7 @@ export default function RegisterPage() {
                 htmlFor="fullName"
                 className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Fullt navn
+                {t.fullName}
               </label>
               <input
                 id="fullName"
@@ -159,7 +170,7 @@ export default function RegisterPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
-                placeholder="Ola Nordmann"
+                placeholder={t.fullNamePlaceholder}
               />
             </div>
 
@@ -168,7 +179,7 @@ export default function RegisterPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
               >
-                E-post
+                {t.email}
               </label>
               <input
                 id="email"
@@ -177,7 +188,7 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
-                placeholder="din@epost.no"
+                placeholder={t.emailPlaceholder}
               />
             </div>
 
@@ -186,7 +197,7 @@ export default function RegisterPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Passord
+                {t.password}
               </label>
               <input
                 id="password"
@@ -195,7 +206,7 @@ export default function RegisterPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
-                placeholder="••••••••"
+                placeholder={t.passwordPlaceholder}
               />
             </div>
 
@@ -204,7 +215,7 @@ export default function RegisterPage() {
                 htmlFor="confirmPassword"
                 className="block text-sm font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Bekreft passord
+                {t.confirmPassword}
               </label>
               <input
                 id="confirmPassword"
@@ -213,7 +224,7 @@ export default function RegisterPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
                 className="mt-1 block w-full rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm placeholder-zinc-400 focus:border-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder-zinc-500"
-                placeholder="••••••••"
+                placeholder={t.passwordPlaceholder}
               />
             </div>
 
@@ -222,17 +233,17 @@ export default function RegisterPage() {
               disabled={loading}
               className="w-full rounded-xl bg-zinc-900 py-3 text-sm font-medium text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              {loading ? "Oppretter konto..." : "Opprett konto"}
+              {loading ? t.submitting : t.submit}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-zinc-600 dark:text-zinc-400">
-            Har du allerede konto?{" "}
+            {t.hasAccount}{" "}
             <Link
               href="/login"
               className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
             >
-              Logg inn
+              {t.login}
             </Link>
           </p>
         </div>
