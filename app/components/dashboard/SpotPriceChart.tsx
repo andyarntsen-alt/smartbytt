@@ -34,10 +34,11 @@ interface SpotPriceChartProps {
 
 type DateOption = "yesterday" | "today" | "tomorrow";
 
-// Constants for Norwegian electricity pricing
-const MVA_RATE = 1.25; // 25% VAT
-const STROMSTOTTE_THRESHOLD_EKS_MVA = 70; // øre/kWh eks mva
-const STROMSTOTTE_THRESHOLD_INKL_MVA = Math.round(STROMSTOTTE_THRESHOLD_EKS_MVA * MVA_RATE); // 87.5 øre inkl mva
+// Constants for Norwegian electricity pricing (updated January 2026)
+// Note: API from hvakosterstrommen.no returns prices INCLUDING 25% VAT
+// Exception: NO4 (Nord-Norge) has 0% VAT on electricity
+const STROMSTOTTE_THRESHOLD_EKS_MVA = 77; // øre/kWh eks mva (from Jan 2026)
+const STROMSTOTTE_THRESHOLD_INKL_MVA = 96; // 96.25 øre inkl mva, rounded
 const STROMSTOTTE_COVERAGE = 0.90; // 90% coverage above threshold
 
 export default function SpotPriceChart({ 
@@ -149,32 +150,36 @@ export default function SpotPriceChart({
   }, [priceArea]);
 
   // Calculate price after strømstøtte (government support)
-  // If price > 70 øre eks mva (87.5 øre inkl mva), government pays 90% of the excess
-  const calculatePriceAfterSupport = (priceInklMva: number): number => {
-    if (priceInklMva <= STROMSTOTTE_THRESHOLD_INKL_MVA) {
-      return priceInklMva;
+  // If price > 77 øre eks mva (96 øre inkl mva), government pays 90% of the excess
+  // For NO4 (Nord-Norge), threshold is 77 øre (no VAT in that region)
+  const isNordNorge = priceArea === "NO4";
+  const supportThreshold = isNordNorge ? STROMSTOTTE_THRESHOLD_EKS_MVA : STROMSTOTTE_THRESHOLD_INKL_MVA;
+  
+  const calculatePriceAfterSupport = (priceOre: number): number => {
+    if (priceOre <= supportThreshold) {
+      return priceOre;
     }
-    const excess = priceInklMva - STROMSTOTTE_THRESHOLD_INKL_MVA;
+    const excess = priceOre - supportThreshold;
     const support = excess * STROMSTOTTE_COVERAGE;
-    return Math.round(priceInklMva - support);
+    return Math.round(priceOre - support);
   };
 
-  // Transform data for the chart - NOW WITH MVA (25%)
+  // Transform data for the chart
+  // API returns prices INCLUDING 25% VAT (except NO4 which has 0% VAT)
   const chartData = prices.map((price) => {
     const hour = new Date(price.time_start).getHours();
-    const priceEksMva = Math.round(price.NOK_per_kWh * 100); // øre eks mva
-    const priceInklMva = Math.round(priceEksMva * MVA_RATE); // øre inkl mva
-    const priceAfterSupport = calculatePriceAfterSupport(priceInklMva);
-    const hasSupport = priceInklMva > STROMSTOTTE_THRESHOLD_INKL_MVA;
+    const priceOre = Math.round(price.NOK_per_kWh * 100); // øre (already includes VAT from API)
+    const priceAfterSupport = calculatePriceAfterSupport(priceOre);
+    const hasSupport = priceOre > supportThreshold;
     
     return {
       hour: `${hour.toString().padStart(2, "0")}:00`,
       hourNum: hour,
-      price: priceInklMva, // Spot price WITH VAT
+      price: priceOre, // Spot price (includes VAT for NO1-3,5, no VAT for NO4)
       priceAfterSupport, // What you actually pay after strømstøtte
       isCurrent: selectedDate === "today" && hour === currentHour,
-      isExpensive: priceInklMva > STROMSTOTTE_THRESHOLD_INKL_MVA * 1.5, // Over 130 øre
-      isCheap: priceInklMva < STROMSTOTTE_THRESHOLD_INKL_MVA * 0.7, // Under 60 øre
+      isExpensive: priceOre > supportThreshold * 1.5,
+      isCheap: priceOre < supportThreshold * 0.6,
       hasSupport,
     };
   });
@@ -288,7 +293,7 @@ export default function SpotPriceChart({
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 border-t-2 border-dashed border-emerald-500"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">Støttegrense (87 øre)</span>
+          <span className="text-zinc-600 dark:text-zinc-400">Støttegrense ({supportThreshold} øre)</span>
         </div>
         <div className="ml-auto flex gap-3 text-zinc-500 dark:text-zinc-400">
           <span>Lavest: <strong className="text-emerald-600 dark:text-emerald-400">{minPriceAfterSupport}</strong></span>
@@ -351,7 +356,7 @@ export default function SpotPriceChart({
               <Tooltip content={<CustomTooltip />} />
               {/* Strømstøtte threshold reference line */}
               <ReferenceLine 
-                y={STROMSTOTTE_THRESHOLD_INKL_MVA} 
+                y={supportThreshold} 
                 stroke="#10b981" 
                 strokeDasharray="8 4" 
                 strokeWidth={2}
@@ -481,21 +486,22 @@ export default function SpotPriceChart({
                 </svg>
               </summary>
               <div className="border-t border-zinc-200 px-3 py-2 text-xs text-zinc-600 space-y-2 dark:border-zinc-700 dark:text-zinc-400">
-                <p><strong>Strømstøtten</strong> er en statlig ordning der staten dekker <strong>90%</strong> av strømprisen over 70 øre/kWh (eks. mva).</p>
+                <p><strong>Strømstøtten</strong> er en statlig ordning der staten dekker <strong>90%</strong> av strømprisen over {STROMSTOTTE_THRESHOLD_EKS_MVA} øre/kWh (eks. mva).</p>
                 
-                <p><strong>Slik beregnes det:</strong></p>
+                <p><strong>Slik beregnes det (fra jan 2026):</strong></p>
                 <ul className="list-disc list-inside space-y-1 text-zinc-500 dark:text-zinc-500">
-                  <li>Grense: 70 øre eks. mva = {STROMSTOTTE_THRESHOLD_INKL_MVA} øre inkl. mva</li>
+                  <li>Grense: {STROMSTOTTE_THRESHOLD_EKS_MVA} øre eks. mva = {STROMSTOTTE_THRESHOLD_INKL_MVA} øre inkl. mva</li>
                   <li>Over grensen: Staten betaler 90% av overskytende</li>
                   <li>Under grensen: Du betaler full pris</li>
+                  {isNordNorge && <li><strong>Nord-Norge:</strong> Ingen mva på strøm (grense {STROMSTOTTE_THRESHOLD_EKS_MVA} øre)</li>}
                 </ul>
 
                 <p className="pt-1 border-t border-zinc-200 dark:border-zinc-700">
-                  <strong>Eksempel:</strong> Spot på 200 øre → Du betaler {STROMSTOTTE_THRESHOLD_INKL_MVA} + 10% av ({200} - {STROMSTOTTE_THRESHOLD_INKL_MVA}) = <strong>{STROMSTOTTE_THRESHOLD_INKL_MVA + Math.round((200 - STROMSTOTTE_THRESHOLD_INKL_MVA) * 0.1)} øre</strong>
+                  <strong>Eksempel:</strong> Spot på 200 øre → Du betaler {supportThreshold} + 10% av (200 - {supportThreshold}) = <strong>{supportThreshold + Math.round((200 - supportThreshold) * 0.1)} øre</strong>
                 </p>
 
                 <p className="text-zinc-400 dark:text-zinc-500">
-                  Gjelder automatisk for alle husholdninger via nettleien.
+                  Gjelder automatisk for alle husholdninger via nettleien. Alternativt kan du velge <strong>Norgespris</strong> (fast 50 øre/kWh) fra okt 2025.
                 </p>
               </div>
             </details>
