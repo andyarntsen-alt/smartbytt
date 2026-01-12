@@ -9,8 +9,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  Line,
-  ComposedChart,
 } from "recharts";
 
 interface HourlyPrice {
@@ -204,35 +202,29 @@ export default function SpotPriceChart({
   };
 
   // Custom tooltip
-  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; dataKey: string }>; label?: string }) => {
+  const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
     if (active && payload && payload.length) {
       const data = chartData.find(d => d.hour === label);
       if (!data) return null;
       
       const isCurrent = data.isCurrent;
-      const spotPrice = data.price;
       const afterSupport = data.priceAfterSupport;
       const hasSupport = data.hasSupport;
-      const savings = spotPrice - afterSupport;
+      const savings = data.price - afterSupport;
       
       return (
         <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
           <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-            {label} {isCurrent && <span className="text-amber-600">(nå)</span>}
+            {label} {isCurrent && "(nå)"}
           </p>
-          <div className="mt-1 space-y-1">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Spot: <span className={spotPrice > 150 ? "text-red-500" : "text-zinc-700 dark:text-zinc-300"}>{spotPrice} øre</span>
+          <p className={`text-lg font-bold ${afterSupport < 70 ? "text-emerald-600 dark:text-emerald-400" : afterSupport > 100 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
+            {afterSupport} øre/kWh
+          </p>
+          {hasSupport && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              inkl. strømstøtte (-{savings} øre)
             </p>
-            <p className={`text-lg font-bold ${afterSupport < 80 ? "text-emerald-600 dark:text-emerald-400" : afterSupport > 120 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"}`}>
-              {afterSupport} øre/kWh
-            </p>
-            {hasSupport && (
-              <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                💰 Strømstøtte: -{savings} øre
-              </p>
-            )}
-          </div>
+          )}
         </div>
       );
     }
@@ -244,9 +236,9 @@ export default function SpotPriceChart({
       {/* Header with date selector */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Strømpris inkl. mva og strømstøtte</h3>
+          <h3 className="text-sm font-semibold sm:text-base dark:text-zinc-100">Strømpris i dag</h3>
           <p className="text-xs text-zinc-500 sm:text-sm dark:text-zinc-400">
-            {priceAreaName} • Se hva du faktisk betaler
+            {priceAreaName} • Inkl. mva, etter strømstøtte
           </p>
         </div>
         
@@ -288,22 +280,19 @@ export default function SpotPriceChart({
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend - simplified */}
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <div className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 bg-zinc-400"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">Spotpris inkl. mva</span>
-        </div>
-        <div className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 bg-amber-500"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">Etter strømstøtte</span>
+          <span className="text-zinc-600 dark:text-zinc-400">Strømpris (etter støtte)</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 border-t-2 border-dashed border-emerald-500"></span>
           <span className="text-zinc-600 dark:text-zinc-400">Støttegrense (87 øre)</span>
         </div>
         <div className="ml-auto flex gap-3 text-zinc-500 dark:text-zinc-400">
-          <span>Du betaler: <strong className="text-emerald-600 dark:text-emerald-400">{minPriceAfterSupport}–{maxPriceAfterSupport}</strong> øre</span>
+          <span>Lavest: <strong className="text-emerald-600 dark:text-emerald-400">{minPriceAfterSupport}</strong></span>
+          <span>Høyest: <strong className="text-red-600 dark:text-red-400">{maxPriceAfterSupport}</strong></span>
         </div>
       </div>
       
@@ -334,9 +323,9 @@ export default function SpotPriceChart({
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
               <defs>
-                <linearGradient id="supportGradient" x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
                   <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                 </linearGradient>
@@ -354,13 +343,13 @@ export default function SpotPriceChart({
                 axisLine={false}
                 domain={[
                   Math.min(Math.floor(minPriceAfterSupport * 0.8), 20), 
-                  Math.ceil(maxPrice * 1.1)
+                  Math.ceil(maxPriceAfterSupport * 1.2)
                 ]}
                 tickFormatter={(value) => `${value}`}
-                width={35}
+                width={30}
               />
               <Tooltip content={<CustomTooltip />} />
-              {/* Strømstøtte threshold - 87 øre inkl mva */}
+              {/* Strømstøtte threshold reference line */}
               <ReferenceLine 
                 y={STROMSTOTTE_THRESHOLD_INKL_MVA} 
                 stroke="#10b981" 
@@ -368,55 +357,18 @@ export default function SpotPriceChart({
                 strokeWidth={2}
                 strokeOpacity={0.7}
               />
-              {/* Spot price line (gray) */}
-              <Line
-                type="stepAfter"
-                dataKey="price"
-                stroke="#a1a1aa"
-                strokeWidth={1.5}
-                dot={(props) => {
-                  const { cx, cy, payload } = props;
-                  const isExpensive = payload.price > STROMSTOTTE_THRESHOLD_INKL_MVA * 1.3;
-                  const isCheap = payload.price < STROMSTOTTE_THRESHOLD_INKL_MVA * 0.7;
-                  
-                  if (payload.isCurrent) {
-                    return (
-                      <circle
-                        key={`spot-${payload.hour}`}
-                        cx={cx}
-                        cy={cy}
-                        r={6}
-                        fill={isExpensive ? "#ef4444" : isCheap ? "#22c55e" : "#a1a1aa"}
-                        stroke="#fff"
-                        strokeWidth={2}
-                      />
-                    );
-                  }
-                  return (
-                    <circle
-                      key={`spot-${payload.hour}`}
-                      cx={cx}
-                      cy={cy}
-                      r={3}
-                      fill={isExpensive ? "#ef4444" : isCheap ? "#22c55e" : "#a1a1aa"}
-                    />
-                  );
-                }}
-                activeDot={{ r: 5, fill: "#71717a", stroke: "#fff", strokeWidth: 2 }}
-              />
-              {/* Price after support (amber) - what you actually pay */}
               <Area
-                type="stepAfter"
+                type="monotone"
                 dataKey="priceAfterSupport"
                 stroke="#f59e0b"
                 strokeWidth={2}
-                fill="url(#supportGradient)"
+                fill="url(#priceGradient)"
                 dot={(props) => {
                   const { cx, cy, payload } = props;
                   if (payload.isCurrent) {
                     return (
                       <circle
-                        key={`support-${payload.hour}`}
+                        key={payload.hour}
                         cx={cx}
                         cy={cy}
                         r={5}
@@ -426,11 +378,11 @@ export default function SpotPriceChart({
                       />
                     );
                   }
-                  return <circle key={`support-${payload.hour}`} cx={cx} cy={cy} r={0} />;
+                  return <circle key={payload.hour} cx={cx} cy={cy} r={0} />;
                 }}
                 activeDot={{ r: 5, fill: "#f59e0b", stroke: "#fff", strokeWidth: 2 }}
               />
-            </ComposedChart>
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </div>
