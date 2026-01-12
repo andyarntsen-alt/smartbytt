@@ -30,24 +30,60 @@ interface SpotPriceChartProps {
   initialAverage: number;
   priceAreaName: string;
   priceArea: string;
+  initialNationalAverage?: number;
 }
 
 type DateOption = "yesterday" | "today" | "tomorrow";
+
+// All Norwegian price areas
+const ALL_PRICE_AREAS = ["NO1", "NO2", "NO3", "NO4", "NO5"];
 
 export default function SpotPriceChart({ 
   initialPrices, 
   initialAverage, 
   priceAreaName,
-  priceArea 
+  priceArea,
+  initialNationalAverage
 }: SpotPriceChartProps) {
   const [selectedDate, setSelectedDate] = useState<DateOption>("today");
   const [prices, setPrices] = useState<HourlyPrice[]>(initialPrices);
   const [average, setAverage] = useState(initialAverage);
+  const [nationalAverage, setNationalAverage] = useState<number | null>(initialNationalAverage ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tomorrowAvailable, setTomorrowAvailable] = useState(true);
   
   const currentHour = new Date().getHours();
+
+  // Fetch national average for a date
+  const fetchNationalAverage = async (year: number, month: string, day: string): Promise<number | null> => {
+    try {
+      const responses = await Promise.allSettled(
+        ALL_PRICE_AREAS.map(area => 
+          fetch(`https://www.hvakosterstrommen.no/api/v1/prices/${year}/${month}-${day}_${area}.json`)
+        )
+      );
+      
+      const allPrices: number[] = [];
+      
+      for (const response of responses) {
+        if (response.status === "fulfilled" && response.value.ok) {
+          const data: HourlyPrice[] = await response.value.json();
+          if (data && data.length > 0) {
+            const areaAvg = data.reduce((sum, p) => sum + p.NOK_per_kWh, 0) / data.length;
+            allPrices.push(areaAvg);
+          }
+        }
+      }
+      
+      if (allPrices.length === 0) return null;
+      
+      // Simple average across all areas
+      return allPrices.reduce((sum, p) => sum + p, 0) / allPrices.length;
+    } catch {
+      return null;
+    }
+  };
 
   // Fetch prices for a specific date
   const fetchPricesForDate = async (dateOption: DateOption) => {
@@ -92,8 +128,12 @@ export default function SpotPriceChart({
       // Calculate average
       const avg = data.reduce((sum, p) => sum + p.NOK_per_kWh, 0) / data.length;
       
+      // Fetch national average
+      const natAvg = await fetchNationalAverage(year, month, day);
+      
       setPrices(data);
       setAverage(avg);
+      setNationalAverage(natAvg);
       if (dateOption === "tomorrow") {
         setTomorrowAvailable(true);
       }
@@ -113,6 +153,7 @@ export default function SpotPriceChart({
       // Use initial data for today
       setPrices(initialPrices);
       setAverage(initialAverage);
+      setNationalAverage(initialNationalAverage ?? null);
       setError(null);
     } else {
       fetchPricesForDate(dateOption);
@@ -242,17 +283,25 @@ export default function SpotPriceChart({
       </div>
 
       {/* Stats row - stacked on mobile */}
-      <div className="mb-4 grid grid-cols-3 gap-2 text-xs sm:flex sm:flex-wrap sm:gap-4">
+      <div className="mb-4 grid grid-cols-2 gap-2 text-xs sm:flex sm:flex-wrap sm:gap-4">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 sm:h-3 sm:w-3"></span>
+          <span className="text-zinc-600 dark:text-zinc-400">
+            <span className="hidden sm:inline">Ditt område: </span><strong className="text-amber-600 dark:text-amber-400">{avgOre}</strong><span className="hidden sm:inline"> øre</span>
+          </span>
+        </div>
+        {nationalAverage !== null && (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500 sm:h-3 sm:w-3"></span>
+            <span className="text-zinc-600 dark:text-zinc-400">
+              <span className="hidden sm:inline">Norges pris: </span><strong className="text-blue-600 dark:text-blue-400">{Math.round(nationalAverage * 100)}</strong><span className="hidden sm:inline"> øre</span>
+            </span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5 sm:gap-2">
           <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500 sm:h-3 sm:w-3"></span>
           <span className="text-zinc-600 dark:text-zinc-400">
             <span className="hidden sm:inline">Lavest: </span><strong className="text-emerald-600 dark:text-emerald-400">{minPrice}</strong><span className="hidden sm:inline"> øre</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 sm:h-3 sm:w-3"></span>
-          <span className="text-zinc-600 dark:text-zinc-400">
-            <span className="hidden sm:inline">Snitt: </span><strong className="text-amber-600 dark:text-amber-400">{avgOre}</strong><span className="hidden sm:inline"> øre</span>
           </span>
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -313,6 +362,21 @@ export default function SpotPriceChart({
                 width={30}
               />
               <Tooltip content={<CustomTooltip />} />
+              {/* National average reference line */}
+              {nationalAverage !== null && (
+                <ReferenceLine 
+                  y={Math.round(nationalAverage * 100)} 
+                  stroke="#3b82f6" 
+                  strokeDasharray="6 3" 
+                  strokeOpacity={0.7}
+                  label={{ 
+                    value: "🇳🇴", 
+                    position: "right",
+                    fontSize: 12
+                  }}
+                />
+              )}
+              {/* Local average reference line */}
               <ReferenceLine 
                 y={avgOre} 
                 stroke="#f59e0b" 

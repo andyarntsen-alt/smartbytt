@@ -143,3 +143,36 @@ export async function fetchAverageSpotPrice(
   
   return today.average;
 }
+
+/**
+ * Fetch national average price (average across all price areas)
+ * This is "Norges pris" - the average electricity price across Norway
+ */
+export async function fetchNationalAveragePrice(
+  date: Date = new Date()
+): Promise<number | null> {
+  const allAreas: PriceArea[] = ["NO1", "NO2", "NO3", "NO4", "NO5"];
+  
+  try {
+    const results = await Promise.allSettled(
+      allAreas.map(area => fetchSpotPrices(date, area))
+    );
+    
+    const averages: number[] = [];
+    
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value) {
+        averages.push(result.value.average);
+      }
+    }
+    
+    if (averages.length === 0) return null;
+    
+    // Simple average across all areas
+    // Note: A more accurate calculation would weight by consumption per area
+    return averages.reduce((sum, avg) => sum + avg, 0) / averages.length;
+  } catch (error) {
+    console.error("Error fetching national average:", error);
+    return null;
+  }
+}
