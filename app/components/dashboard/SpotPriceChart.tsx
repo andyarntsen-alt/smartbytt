@@ -197,13 +197,22 @@ export default function SpotPriceChart({
         </div>
       </div>
 
-      {/* Summary cards - only for today */}
-      {selectedDate === "today" && current && !error && (
+      {/* Summary cards - show for all dates */}
+      {!error && chartData.length > 0 && (
         <div className="mb-4 grid grid-cols-4 gap-2">
-          <div className="rounded-xl bg-amber-50 px-3 py-2 dark:bg-amber-950/40">
-            <p className="text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wide">Nå</p>
-            <p className="text-lg font-bold text-amber-600 dark:text-amber-400 sm:text-xl">{current.youPay}</p>
-          </div>
+          {selectedDate === "today" && current ? (
+            <div className="rounded-xl bg-amber-50 px-3 py-2 dark:bg-amber-950/40">
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 uppercase tracking-wide">Nå</p>
+              <p className="text-lg font-bold text-amber-600 dark:text-amber-400 sm:text-xl">{current.youPay}</p>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-zinc-100 px-3 py-2 dark:bg-zinc-800">
+              <p className="text-[10px] text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                {selectedDate === "yesterday" ? "I går" : "I morgen"}
+              </p>
+              <p className="text-lg font-bold text-zinc-600 dark:text-zinc-300 sm:text-xl">{avg}</p>
+            </div>
+          )}
           <div className="rounded-xl bg-emerald-50 px-3 py-2 dark:bg-emerald-950/40">
             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Billigst</p>
             <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400 sm:text-xl">{cheapest.youPay}</p>
@@ -219,14 +228,14 @@ export default function SpotPriceChart({
         </div>
       )}
 
-      {/* Strømstøtte savings + Norgespris comparison */}
-      {selectedDate === "today" && !error && (
+      {/* Strømstøtte savings + Norgespris comparison - show for all dates */}
+      {!error && chartData.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           {totalSupport > 100 && (
             <div className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 dark:bg-emerald-950/30">
               <span>💰</span>
               <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                Strømstøtte: <strong>~{Math.round(totalSupport / 100)} kr</strong> spart i dag
+                Strømstøtte: <strong>~{Math.round(totalSupport / 100)} kr</strong> spart
               </p>
             </div>
           )}
@@ -246,10 +255,10 @@ export default function SpotPriceChart({
               </p>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 {norgesprisDiff > 5 
-                  ? `✓ ${norgesprisDiff} øre billigere enn snitt i dag`
+                  ? `✓ ${norgesprisDiff} øre billigere enn snitt`
                   : norgesprisDiff < -5 
-                    ? `${Math.abs(norgesprisDiff)} øre dyrere enn snitt i dag`
-                    : "Omtrent likt som snitt i dag"
+                    ? `${Math.abs(norgesprisDiff)} øre dyrere enn snitt`
+                    : "Omtrent likt som snitt"
                 }
               </p>
             </div>
